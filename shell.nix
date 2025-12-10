@@ -33,6 +33,7 @@ pkgs.mkShell rec {
     xorg.libXcursor
     xorg.libXi
     xorg.libXrandr
+    xorg.libxcb
   ];
 
   RUSTC_VERSION = overrides.toolchain.channel;

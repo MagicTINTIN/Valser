@@ -4,3 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+bevy = "0.17"
+bevy_egui = "0.38"
+egui = "0.33.2"
+rodio = "0.21.1"
