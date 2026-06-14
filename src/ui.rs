@@ -198,6 +198,7 @@ fn draw_ui(
                         let idx = playlist.current.or_else(|| {
                             if playlist.tracks.is_empty() { None } else { Some(0) }
                         });
+                        // println!("Hey {}", idx.unwrap_or(0));
                         if let Some(i) = idx {
                             let path = playlist.tracks[i].path.clone();
                             playlist.current = Some(i);
