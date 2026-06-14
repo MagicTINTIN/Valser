@@ -4,7 +4,22 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bevy = "0.17"
-bevy_egui = "0.38"
-egui = "0.33.2"
-rodio = "0.21.1"
+bevy = { version = "0.18.1", default-features = false, features = [
+    "bevy_winit",
+    "bevy_render",
+    "bevy_core_pipeline",
+    "bevy_color",
+    "bevy_log",
+    "default_font",
+    "x11",
+    "wayland",
+] }
+
+bevy_egui = "0.39.1"
+
+rodio = { version = "*", default-features = false, features = [
+    "playback",
+    "symphonia-all",
+] }
+
+rfd = "0.17.1"
