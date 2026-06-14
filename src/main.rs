@@ -8,6 +8,7 @@ use bevy_egui::EguiPlugin;
 use audio::AudioPlugin;
 use playlist::PlaylistPlugin;
 use ui::UiPlugin;
+mod opus_source;
 
 fn main() {
     App::new()

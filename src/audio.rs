@@ -7,6 +7,10 @@ use std::io::BufReader;
 use std::path::Path;
 use std::time::Duration;
 
+
+
+use crate::opus_source::OpusSource;
+
 // Resources
 
 #[derive(Resource, Default, PartialEq, Clone, Copy, Debug)]
@@ -57,7 +61,28 @@ impl AudioState {
     }
 
     fn load_and_play(&mut self, path: &Path) -> Option<Duration> {
-        self.player.stop();
+    self.player.stop();
+
+    let ext = path.extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+
+    if ext == "opus" {
+        match OpusSource::new(path) {
+            Ok(source) => {
+                let duration = source.total_duration();
+                self.duration = duration;
+                self.player.append(source);
+                self.player.play();
+                duration
+            }
+            Err(e) => {
+                bevy::log::error!("Failed to decode opus file: {e}");
+                None
+            }
+        }
+    } else {
         let file = File::open(path).ok()?;
         let decoder = Decoder::try_from(BufReader::new(file)).ok()?;
         let duration = decoder.total_duration();
@@ -66,6 +91,7 @@ impl AudioState {
         self.player.play();
         duration
     }
+}
 
     fn toggle_pause(&mut self) {
         if self.player.is_paused() { self.player.play(); } else { self.player.pause(); }

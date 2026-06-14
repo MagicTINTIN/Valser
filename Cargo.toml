@@ -20,6 +20,11 @@ bevy_egui = "0.39.1"
 rodio = { version = "*", default-features = false, features = [
     "playback",
     "symphonia-all",
+    "symphonia-ogg",
+    "symphonia-mkv",
 ] }
+
+ogg = "0.9"
+opus = "0.3"
 
 rfd = "0.17.1"
