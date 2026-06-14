@@ -1,2 +1,2 @@
 # Valser
-Music player
+Rust Music player
