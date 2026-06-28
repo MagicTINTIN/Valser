@@ -347,6 +347,95 @@ fn draw_ui(
 }
 
 // ---------------------------------------------------------------------------
+// Keyboard shortcuts
+
+fn handle_shortcuts(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut playlist: ResMut<Playlist>,
+    mut audio_cmd: ResMut<AudioCommand>,
+    playback_state: Res<PlaybackState>,
+    mut contexts: EguiContexts,
+) {
+    // Don't steal keystrokes while the user is typing in a text field.
+    if let Ok(ctx) = contexts.ctx_mut() {
+        if ctx.wants_keyboard_input() {
+            return;
+        }
+    }
+
+    let ctrl = keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight);
+    let shift = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
+
+    // Space, or XF86 PlayPause -> toggle play/pause
+    if keys.just_pressed(KeyCode::Space) || keys.just_pressed(KeyCode::MediaPlayPause) {
+        match *playback_state {
+            PlaybackState::Stopped => {
+                let idx = playlist.current.or(if playlist.tracks.is_empty() {
+                    None
+                } else {
+                    Some(0)
+                });
+                if let Some(i) = idx {
+                    let path = playlist.tracks[i].path.clone();
+                    playlist.current = Some(i);
+                    audio_cmd.play = Some(path);
+                }
+            }
+            _ => audio_cmd.toggle_pause = true,
+        }
+    }
+
+    // XF86 next/previous track keys
+    if keys.just_pressed(KeyCode::MediaTrackNext) {
+        if let Some(next) = playlist.next_track() {
+            let path = playlist.tracks[next].path.clone();
+            playlist.current = Some(next);
+            audio_cmd.play = Some(path);
+        }
+    }
+    if keys.just_pressed(KeyCode::MediaTrackPrevious) {
+        if let Some(prev) = playlist.prev_track() {
+            let path = playlist.tracks[prev].path.clone();
+            playlist.current = Some(prev);
+            audio_cmd.play = Some(path);
+        }
+    }
+
+    // Ctrl+Shift+O -> open folder (recursive)
+    if ctrl && shift && keys.just_pressed(KeyCode::KeyO) {
+        if let Some(dir) = rfd::FileDialog::new().pick_folder() {
+            playlist.add_directory_recursive(&dir);
+            if playlist.current.is_none() && !playlist.tracks.is_empty() {
+                playlist.current = Some(0);
+            }
+        }
+        return; // avoid matching the plain Ctrl+O branch below
+    }
+
+    // Ctrl+O -> open files
+    if ctrl && keys.just_pressed(KeyCode::KeyO) {
+        if let Some(paths) = rfd::FileDialog::new()
+            .set_title("Add audio files")
+            .add_filter(
+                "Audio files",
+                &["mp3", "ogg", "opus", "flac", "wav", "m4a", "aac", "aiff"],
+            )
+            .pick_files()
+        {
+            playlist.add_tracks(paths);
+            if playlist.current.is_none() && !playlist.tracks.is_empty() {
+                playlist.current = Some(0);
+            }
+        }
+    }
+
+    // Ctrl+S -> shuffle
+    if ctrl && keys.just_pressed(KeyCode::KeyS) {
+        playlist.shuffle();
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 
 enum PlaylistAction {
@@ -374,6 +463,7 @@ impl Plugin for UiPlugin {
         app.init_resource::<UiState>()
             .add_systems(Update, sync_volume_from_audio)
             .add_systems(Update, auto_advance)
+            .add_systems(Update, handle_shortcuts)
             .add_systems(EguiPrimaryContextPass, draw_ui);
     }
 }
