@@ -1,12 +1,19 @@
 use bevy::prelude::*;
+use std::collections::{BTreeMap, HashSet};
 use std::path::PathBuf;
 use std::time::Duration;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum FilterScope {
-    TrackName,  // tag title, falls back to filename
+    TrackName, // tag title, falls back to filename
     Artist,
-    FileName,   // raw filename, ignoring tags
+    FileName, // raw filename, ignoring tags
+}
+
+impl Default for FilterScope {
+    fn default() -> Self {
+        FilterScope::TrackName
+    }
 }
 
 /// Represents a single track in the playlist.
@@ -43,13 +50,7 @@ impl Track {
             {
                 title = tag.title().map(|s| s.to_string());
                 artist = tag.artist().map(|s| s.to_string());
-                if let Some(genre_field) = tag.genre() {
-                    genres = genre_field
-                        .split(',')
-                        .map(|g| g.trim().to_string())
-                        .filter(|g| !g.is_empty())
-                        .collect();
-                }
+                genres = tag.get_strings(lofty::tag::ItemKey::Genre).map(|g| g.trim().to_string()).collect();
             }
         }
 
@@ -98,6 +99,10 @@ pub struct Playlist {
     pub tracks: Vec<Track>,
     /// Index of the currently playing/selected track.
     pub current: Option<usize>,
+    /// If non-empty, ONLY tracks containing at least one of these genres are shown.
+    pub genre_whitelist: HashSet<String>,
+    /// Tracks containing any of these genres are hidden, even if whitelisted.
+    pub genre_blacklist: HashSet<String>,
 }
 
 impl Playlist {
@@ -164,6 +169,58 @@ impl Playlist {
 
         // Re-find its new index after the shuffle.
         self.current = current_path.and_then(|p| self.tracks.iter().position(|t| t.path == p));
+    }
+
+    /// Returns true if this track should be visible given the current genre whitelist/blacklist settings.
+    pub fn genre_visible(&self, track: &Track) -> bool {
+        // Blacklist wins over whitelist.
+        if track
+            .genres
+            .iter()
+            .any(|g| self.genre_blacklist.contains(g))
+        {
+            return false;
+        }
+        if !self.genre_whitelist.is_empty()
+            && !track
+                .genres
+                .iter()
+                .any(|g| self.genre_whitelist.contains(g))
+        {
+            return false;
+        }
+        true
+    }
+
+    /// Sorted map of genre -> count of tracks currently in the playlist
+    /// having that genre (counts ALL tracks, regardless of current
+    /// whitelist/blacklist, so the sidebar can show "what exists").
+    pub fn genre_counts(&self) -> BTreeMap<String, usize> {
+        let mut counts = BTreeMap::new();
+        for track in &self.tracks {
+            for genre in &track.genres {
+                *counts.entry(genre.clone()).or_insert(0) += 1;
+            }
+        }
+        counts
+    }
+
+    pub fn toggle_whitelist(&mut self, genre: &str) {
+        if self.genre_whitelist.contains(genre) {
+            self.genre_whitelist.remove(genre);
+        } else {
+            self.genre_whitelist.insert(genre.to_string());
+            self.genre_blacklist.remove(genre); // mutually exclusive
+        }
+    }
+
+    pub fn toggle_blacklist(&mut self, genre: &str) {
+        if self.genre_blacklist.contains(genre) {
+            self.genre_blacklist.remove(genre);
+        } else {
+            self.genre_blacklist.insert(genre.to_string());
+            self.genre_whitelist.remove(genre); // mutually exclusive
+        }
     }
 }
 
