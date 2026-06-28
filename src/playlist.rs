@@ -52,6 +52,18 @@ impl Playlist {
         }
     }
 
+    /// Recursively scans a directory and adds every supported audio file found.
+    pub fn add_directory_recursive(&mut self, dir: &std::path::Path) {
+        let paths: Vec<PathBuf> = walkdir::WalkDir::new(dir)
+            .into_iter()
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| entry.file_type().is_file())
+            .map(|entry| entry.into_path())
+            .filter(|path| is_supported_format(path))
+            .collect();
+        self.add_tracks(paths);
+    }
+
     pub fn remove_track(&mut self, index: usize) {
         self.tracks.remove(index);
         // Adjust current index after removal.
@@ -81,6 +93,22 @@ impl Playlist {
             Some(i) if i > 0 => Some(i - 1),
             _ => None,
         }
+    }
+
+    /// Shuffles the playlist, keeping current pointing at the same track.
+    pub fn shuffle(&mut self) {
+        use rand::seq::SliceRandom;
+        let mut rng = rand::rng();
+
+        // Remember which track is currently playing. (using path)
+        let current_path = self.current.map(|i| self.tracks[i].path.clone());
+
+        self.tracks.shuffle(&mut rng);
+
+        // Re-find its new index after the shuffle.
+        self.current = current_path.and_then(|p| {
+            self.tracks.iter().position(|t| t.path == p)
+        });
     }
 }
 

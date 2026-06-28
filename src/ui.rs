@@ -17,14 +17,12 @@ pub struct UiState {
     pub volume: f32,
     pub seeking: bool,
     pub seek_preview: f32,
+    pub filter: String,
 }
 
 // Systems
 
-fn sync_volume_from_audio(
-    playback_info: Res<PlaybackInfo>,
-    mut ui_state: ResMut<UiState>,
-) {
+fn sync_volume_from_audio(playback_info: Res<PlaybackInfo>, mut ui_state: ResMut<UiState>) {
     if !ui_state.seeking {
         ui_state.volume = playback_info.volume;
     }
@@ -87,6 +85,13 @@ fn draw_ui(
         // Top bar
         ui.horizontal(|ui| {
             ui.heading("🎵 Valser");
+            ui.horizontal(|ui| {
+                ui.label("🔍");
+                ui.text_edit_singleline(&mut ui_state.filter);
+                if !ui_state.filter.is_empty() && ui.small_button("✖").clicked() {
+                    ui_state.filter.clear();
+                }
+            });
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui.button("➕ Add Files").clicked() {
                     if let Some(paths) = pick_audio_files() {
@@ -108,28 +113,47 @@ fn draw_ui(
             .show(ui, |ui| {
                 let mut action: Option<PlaylistAction> = None;
 
+                let filter_lower = ui_state.filter.to_lowercase();
                 for (i, track) in playlist.tracks.iter().enumerate() {
+                    if !filter_lower.is_empty()
+                        && !track.name.to_lowercase().contains(&filter_lower)
+                    {
+                        continue;
+                    }
                     let is_current = playlist.current == Some(i);
                     let is_playing = is_current && *playback_state == PlaybackState::Playing;
 
                     ui.horizontal(|ui| {
-                        let indicator = if is_playing { "▶" } else if is_current { "◼" } else { "  " };
-                        ui.label(egui::RichText::new(indicator).color(
-                            if is_current { egui::Color32::from_rgb(100, 200, 100) }
-                            else { egui::Color32::GRAY },
-                        ));
+                        let indicator = if is_playing {
+                            "▶"
+                        } else if is_current {
+                            "◼"
+                        } else {
+                            "  "
+                        };
+                        ui.label(egui::RichText::new(indicator).color(if is_current {
+                            egui::Color32::from_rgb(200, 75, 75)
+                        } else {
+                            egui::Color32::GRAY
+                        }));
 
                         let label = egui::RichText::new(format!("{}. {}", i + 1, &track.name))
-                            .color(if is_current { egui::Color32::WHITE } else { egui::Color32::LIGHT_GRAY });
+                            .color(if is_current {
+                                egui::Color32::WHITE
+                            } else {
+                                egui::Color32::LIGHT_GRAY
+                            });
 
-                        if ui.add(egui::Label::new(label).sense(egui::Sense::click()))
+                        if ui
+                            .add(egui::Label::new(label).sense(egui::Sense::click()))
                             .double_clicked()
                         {
                             action = Some(PlaylistAction::Play(i));
                         }
 
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if ui.add(egui::Button::new("✖").small())
+                            if ui
+                                .add(egui::Button::new("✖").small())
                                 .on_hover_text("Remove")
                                 .clicked()
                             {
@@ -137,8 +161,10 @@ fn draw_ui(
                             }
                             if let Some(dur) = track.duration {
                                 ui.label(
-                                    egui::RichText::new(crate::playlist::Track::format_duration(dur))
-                                        .color(egui::Color32::GRAY),
+                                    egui::RichText::new(crate::playlist::Track::format_duration(
+                                        dur,
+                                    ))
+                                    .color(egui::Color32::GRAY),
                                 );
                             }
                         });
@@ -154,7 +180,9 @@ fn draw_ui(
                     Some(PlaylistAction::Remove(i)) => {
                         let was_current = playlist.current == Some(i);
                         playlist.remove_track(i);
-                        if was_current { audio_cmd.stop = true; }
+                        if was_current {
+                            audio_cmd.stop = true;
+                        }
                     }
                     None => {}
                 }
@@ -173,10 +201,17 @@ fn draw_ui(
         ui.separator();
 
         // Seek bar
-        let total_secs = playback_info.duration.map(|d| d.as_secs_f32()).unwrap_or(0.0);
+        let total_secs = playback_info
+            .duration
+            .map(|d| d.as_secs_f32())
+            .unwrap_or(0.0);
         let pos_secs = playback_info.position.as_secs_f32();
 
-        let mut seek_val = if ui_state.seeking { ui_state.seek_preview } else { pos_secs };
+        let mut seek_val = if ui_state.seeking {
+            ui_state.seek_preview
+        } else {
+            pos_secs
+        };
 
         ui.horizontal(|ui| {
             ui.label(crate::playlist::Track::format_duration(
@@ -211,7 +246,8 @@ fn draw_ui(
 
         // Transport + volume
         ui.horizontal(|ui| {
-            if ui.add_enabled(playlist.prev_track().is_some(), egui::Button::new("⏮"))
+            if ui
+                .add_enabled(playlist.prev_track().is_some(), egui::Button::new("⏮"))
                 .on_hover_text("Previous")
                 .clicked()
             {
@@ -222,12 +258,24 @@ fn draw_ui(
                 }
             }
 
-            let play_label = if *playback_state == PlaybackState::Playing { "⏸" } else { "▶" };
-            if ui.button(play_label).on_hover_text("Play / Pause").clicked() {
+            let play_label = if *playback_state == PlaybackState::Playing {
+                "⏸"
+            } else {
+                "▶"
+            };
+            if ui
+                .button(play_label)
+                .on_hover_text("Play / Pause")
+                .clicked()
+            {
                 match *playback_state {
                     PlaybackState::Stopped => {
                         let idx = playlist.current.or_else(|| {
-                            if playlist.tracks.is_empty() { None } else { Some(0) }
+                            if playlist.tracks.is_empty() {
+                                None
+                            } else {
+                                Some(0)
+                            }
                         });
                         // println!("Hey {}", idx.unwrap_or(0));
                         if let Some(i) = idx {
@@ -236,18 +284,25 @@ fn draw_ui(
                             audio_cmd.play = Some(path);
                         }
                     }
-                    _ => { audio_cmd.toggle_pause = true; }
+                    _ => {
+                        audio_cmd.toggle_pause = true;
+                    }
                 }
             }
 
-            if ui.add_enabled(*playback_state != PlaybackState::Stopped, egui::Button::new("⏹"))
+            if ui
+                .add_enabled(
+                    *playback_state != PlaybackState::Stopped,
+                    egui::Button::new("⏹"),
+                )
                 .on_hover_text("Stop")
                 .clicked()
             {
                 audio_cmd.stop = true;
             }
 
-            if ui.add_enabled(playlist.next_track().is_some(), egui::Button::new("⏭"))
+            if ui
+                .add_enabled(playlist.next_track().is_some(), egui::Button::new("⏭"))
                 .on_hover_text("Next")
                 .clicked()
             {
@@ -262,7 +317,12 @@ fn draw_ui(
             ui.label("🔊");
 
             let mut vol = ui_state.volume;
-            if ui.add(egui::Slider::new(&mut vol, 0.0..=1.0).show_value(false).trailing_fill(true))
+            if ui
+                .add(
+                    egui::Slider::new(&mut vol, 0.0..=1.0)
+                        .show_value(false)
+                        .trailing_fill(true),
+                )
                 .changed()
             {
                 ui_state.volume = vol;
@@ -289,12 +349,18 @@ fn draw_ui(
 // ---------------------------------------------------------------------------
 // Helpers
 
-enum PlaylistAction { Play(usize), Remove(usize) }
+enum PlaylistAction {
+    Play(usize),
+    Remove(usize),
+}
 
 fn pick_audio_files() -> Option<Vec<PathBuf>> {
     rfd::FileDialog::new()
         .set_title("Add audio files")
-        .add_filter("Audio files", &["mp3", "ogg", "opus", "flac", "wav", "m4a", "aac", "aiff"])
+        .add_filter(
+            "Audio files",
+            &["mp3", "ogg", "opus", "flac", "wav", "m4a", "aac", "aiff"],
+        )
         .pick_files()
 }
 
