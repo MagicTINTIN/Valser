@@ -137,7 +137,7 @@ fn draw_ui(
                             egui::Color32::GRAY
                         }));
 
-                        let label = egui::RichText::new(format!("{}. {}", i + 1, &track.name))
+                        let label = egui::RichText::new(format!("{}. {}", i + 1, track.display_name()))
                             .color(if is_current {
                                 egui::Color32::WHITE
                             } else {
@@ -333,7 +333,7 @@ fn draw_ui(
                 if let Some(i) = playlist.current {
                     if let Some(track) = playlist.tracks.get(i) {
                         ui.label(
-                            egui::RichText::new(format!("♪ {}", &track.name))
+                            egui::RichText::new(format!("♪ {}", &track.display_name()))
                                 .color(egui::Color32::from_rgb(150, 200, 255))
                                 .small(),
                         );

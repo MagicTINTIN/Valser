@@ -2,12 +2,21 @@ use bevy::prelude::*;
 use std::path::PathBuf;
 use std::time::Duration;
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum FilterScope {
+    TrackName,  // tag title, falls back to filename
+    Artist,
+    FileName,   // raw filename, ignoring tags
+}
+
 /// Represents a single track in the playlist.
 #[derive(Debug, Clone)]
 pub struct Track {
     pub path: PathBuf,
-    /// Display name derived from the filename.
-    pub name: String,
+    pub name: String,          // filename without extension (fallback display)
+    pub title: Option<String>, // from tags
+    pub artist: Option<String>,
+    pub genres: Vec<String>, // split on ','
     /// Total duration, populated once the track has been decoded once.
     pub duration: Option<Duration>,
 }
@@ -19,19 +28,67 @@ impl Track {
             .and_then(|s| s.to_str())
             .unwrap_or("Unknown")
             .to_string();
+
+        let mut title = None;
+        let mut artist = None;
+        let mut genres = Vec::new();
+
+        if let Ok(tagged_file) = lofty::read_from_path(&path) {
+            use lofty::file::TaggedFileExt;
+            use lofty::tag::Accessor;
+
+            if let Some(tag) = tagged_file
+                .primary_tag()
+                .or_else(|| tagged_file.first_tag())
+            {
+                title = tag.title().map(|s| s.to_string());
+                artist = tag.artist().map(|s| s.to_string());
+                if let Some(genre_field) = tag.genre() {
+                    genres = genre_field
+                        .split(',')
+                        .map(|g| g.trim().to_string())
+                        .filter(|g| !g.is_empty())
+                        .collect();
+                }
+            }
+        }
+
         Self {
             path,
             name,
+            title,
+            artist,
+            genres,
             duration: None,
         }
     }
 
-    /// Pretty-formats a duration as mm:ss.
+    /// What to show in the playlist row: tag title if present, else filename.
+    pub fn display_name(&self) -> &str {
+        self.title.as_deref().unwrap_or(&self.name)
+    }
+
     pub fn format_duration(d: Duration) -> String {
         let total = d.as_secs();
         let minutes = total / 60;
         let seconds = total % 60;
         format!("{:02}:{:02}", minutes, seconds)
+    }
+
+    pub fn matches_filter(&self, query: &str, scope: FilterScope) -> bool {
+        if query.is_empty() {
+            return true;
+        }
+        let q = query.to_lowercase();
+        match scope {
+            FilterScope::TrackName => self.display_name().to_lowercase().contains(&q),
+            FilterScope::Artist => self
+                .artist
+                .as_deref()
+                .map(|a| a.to_lowercase().contains(&q))
+                .unwrap_or(false),
+            FilterScope::FileName => self.name.to_lowercase().contains(&q),
+        }
     }
 }
 
@@ -106,9 +163,7 @@ impl Playlist {
         self.tracks.shuffle(&mut rng);
 
         // Re-find its new index after the shuffle.
-        self.current = current_path.and_then(|p| {
-            self.tracks.iter().position(|t| t.path == p)
-        });
+        self.current = current_path.and_then(|p| self.tracks.iter().position(|t| t.path == p));
     }
 }
 
@@ -120,8 +175,10 @@ fn is_supported_format(path: &std::path::Path) -> bool {
         .map(|e| e.to_lowercase())
         .as_deref()
     {
-        Some("mp3" | "ogg" | "opus" | "flac" | "wav" | "m4a" | "aac" | "aiff" | "alac"
-            | "mp4" | "webm" | "mkv") => true,
+        Some(
+            "mp3" | "ogg" | "opus" | "flac" | "wav" | "m4a" | "aac" | "aiff" | "alac" | "mp4"
+            | "webm" | "mkv",
+        ) => true,
         _ => false,
     }
 }
