@@ -1,4 +1,6 @@
 use bevy::prelude::*;
+use bevy_egui::egui::style::Selection;
+use bevy_egui::egui::{Color32, Stroke, Style, Theme};
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use std::path::PathBuf;
 use std::time::Duration;
@@ -46,6 +48,29 @@ fn auto_advance(
     }
 }
 
+fn setup_custom_style(ctx: &egui::Context) {
+    ctx.style_mut_of(Theme::Light, use_light_red_accent);
+    ctx.style_mut_of(Theme::Dark, use_dark_red_accent);
+}
+
+fn use_light_red_accent(style: &mut Style) {
+    style.visuals.hyperlink_color = Color32::from_rgb(180, 30, 20);
+    style.visuals.text_cursor.stroke.color = Color32::from_rgb(92, 20, 20);
+    style.visuals.selection = Selection {
+        bg_fill: Color32::from_rgb(228, 169, 157),
+        stroke: Stroke::new(1.0_f32, Color32::from_rgb(92, 20, 20)),
+    };
+}
+
+fn use_dark_red_accent(style: &mut Style) {
+    style.visuals.hyperlink_color = Color32::from_rgb(222, 105, 105);
+    style.visuals.text_cursor.stroke.color = Color32::from_rgb(255, 200, 200);
+    style.visuals.selection = Selection {
+        bg_fill: Color32::from_rgb(140, 50, 50),
+        stroke: Stroke::new(1.0_f32, Color32::from_rgb(255, 200, 200)),
+    };
+}
+
 /// The main egui draw system.
 fn draw_ui(
     mut contexts: EguiContexts,
@@ -56,6 +81,7 @@ fn draw_ui(
     playback_state: Res<PlaybackState>,
 ) -> Result {
     let ctx = contexts.ctx_mut()?;
+    setup_custom_style(&ctx);
 
     egui::CentralPanel::default().show(ctx, |ui| {
         // Top bar
@@ -157,6 +183,15 @@ fn draw_ui(
                 Duration::from_secs_f32(pos_secs.max(0.0)),
             ));
 
+            ui.label("/");
+
+            ui.label(crate::playlist::Track::format_duration(
+                Duration::from_secs_f32(total_secs),
+            ));
+
+            // ui.style_mut().visuals.color
+
+            ui.style_mut().spacing.slider_width = ui.available_width();
             let seek_slider = ui.add_enabled(
                 total_secs > 0.0,
                 egui::Slider::new(&mut seek_val, 0.0..=total_secs.max(1.0))
@@ -172,10 +207,6 @@ fn draw_ui(
                 ui_state.seeking = false;
                 audio_cmd.seek = Some(Duration::from_secs_f32(seek_val));
             }
-
-            ui.label(crate::playlist::Track::format_duration(
-                Duration::from_secs_f32(total_secs),
-            ));
         });
 
         // Transport + volume
