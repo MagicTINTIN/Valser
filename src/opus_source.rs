@@ -1,13 +1,12 @@
 use rodio::Source;
-use std::collections::VecDeque;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 use std::time::Duration;
 
-/// A rodio `Source` that decodes an OGG/Opus file in pure Rust.
 pub struct OpusSource {
-    samples: VecDeque<f32>,
+    samples: Vec<f32>,
+    pos: usize,           // current read position (sample index)
     sample_rate: u32,
     channels: u16,
     total_duration: Option<Duration>,
@@ -51,21 +50,25 @@ impl OpusSource {
 
         // Remove the pre-skip samples.
         let skip = pre_skip * channels as usize;
-        let samples: VecDeque<f32> = all_samples.into_iter().skip(skip).collect();
+        let samples: Vec<f32> = all_samples.into_iter().skip(skip).collect();
 
         let total_samples = samples.len() / channels as usize;
         let total_duration = Some(Duration::from_secs_f64(
             total_samples as f64 / sample_rate as f64,
         ));
 
-        Ok(Self { samples, sample_rate, channels, total_duration })
+        Ok(Self { samples, pos: 0, sample_rate, channels, total_duration })
     }
 }
 
 impl Iterator for OpusSource {
     type Item = f32;
     fn next(&mut self) -> Option<f32> {
-        self.samples.pop_front()
+        let s = self.samples.get(self.pos).copied();
+        if s.is_some() {
+            self.pos += 1;
+        }
+        s
     }
 }
 
@@ -78,4 +81,11 @@ impl Source for OpusSource {
         std::num::NonZero::new(self.sample_rate).unwrap()
     }
     fn total_duration(&self) -> Option<Duration> { self.total_duration }
+
+    fn try_seek(&mut self, pos: Duration) -> Result<(), rodio::source::SeekError> {
+        let target_sample = (pos.as_secs_f64() * self.sample_rate as f64) as usize
+            * self.channels as usize;
+        self.pos = target_sample.min(self.samples.len());
+        Ok(())
+    }
 }
