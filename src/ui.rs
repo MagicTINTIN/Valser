@@ -455,6 +455,7 @@ fn handle_shortcuts(
     mut playlist: ResMut<Playlist>,
     mut audio_cmd: ResMut<AudioCommand>,
     playback_state: Res<PlaybackState>,
+    playback_info: Res<PlaybackInfo>,
     mut contexts: EguiContexts,
 ) {
     // Don't steal keystrokes while the user is typing in a text field.
@@ -484,6 +485,28 @@ fn handle_shortcuts(
             }
             _ => audio_cmd.toggle_pause = true,
         }
+        return;
+    }
+    
+    if keys.pressed(KeyCode::ArrowRight) {
+        let new_pos = playback_info.position.saturating_add(Duration::from_millis(500));
+        audio_cmd.seek = Some(new_pos);
+        return;
+    }
+    if keys.pressed(KeyCode::ArrowLeft) {
+        let new_pos = playback_info.position.saturating_sub(Duration::from_millis(500));
+        audio_cmd.seek = Some(new_pos);
+        return;
+    }
+    
+    if keys.just_pressed(KeyCode::KeyJ) {
+        let new_pos = playback_info.position.saturating_add(Duration::from_secs(10));
+        audio_cmd.seek = Some(new_pos);
+        return;
+    }
+    if keys.just_pressed(KeyCode::KeyL) {
+        let new_pos = playback_info.position.saturating_sub(Duration::from_secs(10));
+        audio_cmd.seek = Some(new_pos);
         return;
     }
 
