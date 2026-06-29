@@ -1,6 +1,5 @@
 use bevy::prelude::*;
 use mpris_server::{Metadata, PlaybackStatus, Player, Time};
-use std::any::Any;
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 
@@ -12,7 +11,7 @@ pub enum MprisCommand {
     Next,
     Previous,
     Stop,
-    Seek(i64),
+    Seek(Time),
 }
 
 pub struct MprisReceiver(pub Receiver<MprisCommand>);
@@ -30,6 +29,7 @@ pub enum MprisStateUpdate {
         artist: String,
         length_secs: f64,
     },
+    Position(f64),
 }
 
 pub struct MprisPlugin;
@@ -108,6 +108,12 @@ async fn run_mpris_server(cmd_tx: Sender<MprisCommand>, state_rx: Receiver<Mpris
             let _ = tx.send(MprisCommand::Stop);
         });
     }
+    {
+        let tx = cmd_tx.clone();
+        player.connect_seek(move |_, seek_value| {
+            let _ = tx.send(MprisCommand::Seek(seek_value));
+        });
+    }
 
     let run_fut = player.run();
 
@@ -136,6 +142,10 @@ async fn run_mpris_server(cmd_tx: Sender<MprisCommand>, state_rx: Receiver<Mpris
                             .build();
                         let _ = player.set_metadata(metadata).await;
                     }
+                    MprisStateUpdate::Position(secs) => {
+                        // counts as activity for playerctld's recency tracking.
+                        let _ = player.seeked(Time::from_secs(secs as i64)).await;
+                    }
                 }
             }
             smol::Timer::after(Duration::from_millis(100)).await;
@@ -154,15 +164,18 @@ fn drain_mpris_commands(
     use crate::audio::PlaybackState;
 
     while let Ok(cmd) = receiver.0.try_recv() {
-        debug!("{}", match cmd {
-            MprisCommand::PlayPause => "PlayPause",
-            MprisCommand::Play => "Play",
-            MprisCommand::Pause => "Pause",
-            MprisCommand::Next => "Next",
-            MprisCommand::Previous => "Previous",
-            MprisCommand::Stop => "Stop",
-            MprisCommand::Seek(_) => "Seek",
-        });
+        debug!(
+            "{}",
+            match cmd {
+                MprisCommand::PlayPause => "PlayPause",
+                MprisCommand::Play => "Play",
+                MprisCommand::Pause => "Pause",
+                MprisCommand::Next => "Next",
+                MprisCommand::Previous => "Previous",
+                MprisCommand::Stop => "Stop",
+                MprisCommand::Seek(_) => "Seek",
+            }
+        );
         match cmd {
             MprisCommand::PlayPause => match *playback_state {
                 PlaybackState::Stopped => {
@@ -204,8 +217,10 @@ fn drain_mpris_commands(
                     audio_cmd.play = Some(path);
                 }
             }
-            MprisCommand::Seek(_offset_us) => {
-                // TODO: handle relative seeks from MPRIS clients.
+            MprisCommand::Seek(time_value) => {
+                audio_cmd.seek = Some(Duration::from_micros(
+                    time_value.as_micros().try_into().unwrap_or(0),
+                ));
             }
         }
     }

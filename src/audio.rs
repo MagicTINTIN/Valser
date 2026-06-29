@@ -219,6 +219,13 @@ fn update_audio(
 
     if *playback_state == PlaybackState::Playing {
         playback_info.position = audio.position();
+        
+        if let Some(tx) = &mpris_tx {
+            let _ = tx.0.send(crate::mpris::MprisStateUpdate::Position(
+                playback_info.position.as_secs_f64(),
+            ));
+        }
+
         if audio.is_empty() {
             *playback_state = PlaybackState::Stopped;
             playback_info.position = Duration::ZERO;
