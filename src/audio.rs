@@ -7,8 +7,6 @@ use std::io::BufReader;
 use std::path::Path;
 use std::time::Duration;
 
-
-
 use crate::opus_source::OpusSource;
 
 // Resources
@@ -39,7 +37,11 @@ pub struct PlaybackInfo {
 
 impl Default for PlaybackInfo {
     fn default() -> Self {
-        Self { position: Duration::ZERO, duration: None, volume: 1.0 }
+        Self {
+            position: Duration::ZERO,
+            duration: None,
+            volume: 1.0,
+        }
     }
 }
 
@@ -57,44 +59,53 @@ impl AudioState {
         let handle = DeviceSinkBuilder::open_default_sink().ok()?;
         let player = Player::connect_new(&handle.mixer());
         player.set_volume(1.0);
-        Some(Self { _handle: handle, player, duration: None })
+        Some(Self {
+            _handle: handle,
+            player,
+            duration: None,
+        })
     }
 
     fn load_and_play(&mut self, path: &Path) -> Option<Duration> {
-    self.player.stop();
+        self.player.stop();
 
-    let ext = path.extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-        .to_lowercase();
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_lowercase();
 
-    if ext == "opus" {
-        match OpusSource::new(path) {
-            Ok(source) => {
-                let duration = source.total_duration();
-                self.duration = duration;
-                self.player.append(source);
-                self.player.play();
-                duration
+        if ext == "opus" {
+            match OpusSource::new(path) {
+                Ok(source) => {
+                    let duration = source.total_duration();
+                    self.duration = duration;
+                    self.player.append(source);
+                    self.player.play();
+                    duration
+                }
+                Err(e) => {
+                    bevy::log::error!("Failed to decode opus file: {e}");
+                    None
+                }
             }
-            Err(e) => {
-                bevy::log::error!("Failed to decode opus file: {e}");
-                None
-            }
+        } else {
+            let file = File::open(path).ok()?;
+            let decoder = Decoder::try_from(BufReader::new(file)).ok()?;
+            let duration = decoder.total_duration();
+            self.duration = duration;
+            self.player.append(decoder);
+            self.player.play();
+            duration
         }
-    } else {
-        let file = File::open(path).ok()?;
-        let decoder = Decoder::try_from(BufReader::new(file)).ok()?;
-        let duration = decoder.total_duration();
-        self.duration = duration;
-        self.player.append(decoder);
-        self.player.play();
-        duration
     }
-}
 
     fn toggle_pause(&mut self) {
-        if self.player.is_paused() { self.player.play(); } else { self.player.pause(); }
+        if self.player.is_paused() {
+            self.player.play();
+        } else {
+            self.player.pause();
+        }
     }
 
     fn stop(&mut self) {
@@ -102,11 +113,21 @@ impl AudioState {
         self.duration = None;
     }
 
-    fn seek(&mut self, pos: Duration) { let _ = self.player.try_seek(pos); }
-    fn set_volume(&mut self, v: f32) { self.player.set_volume(v); }
-    fn is_paused(&self) -> bool { self.player.is_paused() }
-    fn is_empty(&self) -> bool { self.player.empty() }
-    fn position(&self) -> Duration { self.player.get_pos() }
+    fn seek(&mut self, pos: Duration) {
+        let _ = self.player.try_seek(pos);
+    }
+    fn set_volume(&mut self, v: f32) {
+        self.player.set_volume(v);
+    }
+    fn is_paused(&self) -> bool {
+        self.player.is_paused()
+    }
+    fn is_empty(&self) -> bool {
+        self.player.empty()
+    }
+    fn position(&self) -> Duration {
+        self.player.get_pos()
+    }
 }
 
 // Messages
@@ -129,6 +150,8 @@ fn update_audio(
     mut playback_info: ResMut<PlaybackInfo>,
     mut track_finished: MessageWriter<TrackFinished>,
     audio: Option<NonSendMut<AudioState>>,
+    mpris_tx: Option<Res<crate::mpris::MprisStateSender>>,
+    playlist: Res<crate::playlist::Playlist>,
 ) {
     let Some(mut audio) = audio else { return };
 
@@ -137,12 +160,41 @@ fn update_audio(
         playback_info.duration = duration;
         playback_info.position = Duration::ZERO;
         *playback_state = PlaybackState::Playing;
+
+        // push Playing status to mpris with metadata for the newly loaded track
+        if let Some(tx) = &mpris_tx {
+            let _ = tx.0.send(crate::mpris::MprisStateUpdate::Playing);
+
+            if let Some(i) = playlist.current {
+                if let Some(track) = playlist.tracks.get(i) {
+                    let _ = tx.0.send(crate::mpris::MprisStateUpdate::Metadata {
+                        title: track.display_name().to_string(),
+                        artist: track.artist.clone().unwrap_or_default(),
+                        length_secs: duration.map(|d| d.as_secs_f64()).unwrap_or(0.0),
+                    });
+                }
+            }
+        }
     }
 
     if commands_res.toggle_pause {
         commands_res.toggle_pause = false;
         audio.toggle_pause();
-        *playback_state = if audio.is_paused() { PlaybackState::Paused } else { PlaybackState::Playing };
+        *playback_state = if audio.is_paused() {
+            PlaybackState::Paused
+        } else {
+            PlaybackState::Playing
+        };
+
+        // send the state to mpris too
+        if let Some(tx) = &mpris_tx {
+            let update = if *playback_state == PlaybackState::Paused {
+                crate::mpris::MprisStateUpdate::Paused
+            } else {
+                crate::mpris::MprisStateUpdate::Playing
+            };
+            let _ = tx.0.send(update);
+        }
     }
 
     if commands_res.stop {
@@ -151,9 +203,15 @@ fn update_audio(
         playback_info.duration = None;
         playback_info.position = Duration::ZERO;
         *playback_state = PlaybackState::Stopped;
+
+        if let Some(tx) = &mpris_tx {
+            let _ = tx.0.send(crate::mpris::MprisStateUpdate::Stopped);
+        }
     }
 
-    if let Some(pos) = commands_res.seek.take() { audio.seek(pos); }
+    if let Some(pos) = commands_res.seek.take() {
+        audio.seek(pos);
+    }
     if let Some(vol) = commands_res.volume.take() {
         audio.set_volume(vol);
         playback_info.volume = vol;
@@ -165,6 +223,11 @@ fn update_audio(
             *playback_state = PlaybackState::Stopped;
             playback_info.position = Duration::ZERO;
             track_finished.write(TrackFinished);
+
+            // track ended naturally -> report Stopped too.
+            if let Some(tx) = &mpris_tx {
+                let _ = tx.0.send(crate::mpris::MprisStateUpdate::Stopped);
+            }
         }
     }
 }

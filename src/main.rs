@@ -1,6 +1,7 @@
 mod audio;
 mod playlist;
 mod ui;
+mod mpris;
 
 use bevy::prelude::*;
 use bevy_egui::EguiPlugin;
@@ -8,6 +9,7 @@ use bevy_egui::EguiPlugin;
 use audio::AudioPlugin;
 use playlist::PlaylistPlugin;
 use ui::UiPlugin;
+use mpris::MprisPlugin;
 mod opus_source;
 
 fn main() {
@@ -22,6 +24,7 @@ fn main() {
         }))
         .add_plugins(EguiPlugin::default())
         .add_plugins(AudioPlugin)
+        .add_plugins(MprisPlugin)
         .add_plugins(PlaylistPlugin)
         .add_plugins(UiPlugin)
         .add_systems(Startup, setup)
