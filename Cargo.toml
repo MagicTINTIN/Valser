@@ -10,6 +10,13 @@ documentation = "https://github.com/MagicTINTIN/Valser/wiki"
 version = "0.2.0"
 edition = "2021"
 
+[package.metadata.release]
+pre-release-hook = ["git", "cliff", "-o", "CHANGELOG.md"]
+pre-release-commit-message = "chore(release): {{version}}"
+tag-message = "Release {{version}}"
+tag-name = "v{{version}}"
+sign-tag = false
+
 [dependencies]
 bevy = { version = "0.18.1", default-features = false, features = [
     "bevy_winit",
