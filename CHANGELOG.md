@@ -4,7 +4,18 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 ---
-## \<unreleased\> <small><small><small>[(compare)](https://github.com/MagicTINTIN/Valser/compare/v0.0.1..main)</small></small></small>
+## [\<0.2.1\>](https://github.com/MagicTINTIN/Valser/releases/v0.2.1) - 2026-06-30 <small><small><small>[(compare)](https://github.com/MagicTINTIN/Valser/compare/v0.2.0..v0.2.1)</small></small></small>
+
+### 🐛 Bug Fixes
+
+- using pre release hook of git cliff <small><small>[(2154694)](https://github.com/MagicTINTIN/Valser/commit/21546942beccbcef80e160cbc6840b983a437361)</small></small>
+
+### 🏗️ Build
+
+- adding a script to bump version <small><small>[(a709626)](https://github.com/MagicTINTIN/Valser/commit/a709626728873f5010d037847abc90e22ba3397f)</small></small>
+
+---
+## [\<0.2.0\>](https://github.com/MagicTINTIN/Valser/releases/v0.2.0) - 2026-06-30 <small><small><small>[(compare)](https://github.com/MagicTINTIN/Valser/compare/v0.0.1..v0.2.0)</small></small></small>
 
 ### 🚀 Features
 
@@ -22,10 +33,12 @@ All notable changes to this project will be documented in this file. See [conven
 ### ⚙️ Miscellaneous Chores
 
 - adding egui default example <small><small>[(6ebb56d)](https://github.com/MagicTINTIN/Valser/commit/6ebb56dc0d281390407c67752ab42d754cedbc1a)</small></small>
+- Release valser version 0.2.0 <small><small>[(42e625c)](https://github.com/MagicTINTIN/Valser/commit/42e625c29a967b73f2bac7ef525a3db6bce4865f)</small></small>
 
 ### 📚 Documentation
 
 - adding cargo toml missing fields <small><small>[(c6ca9b4)](https://github.com/MagicTINTIN/Valser/commit/c6ca9b4f1e5c6f7697a1b71655a7c27b18901c8d)</small></small>
+- adding changelog <small><small>[(353edd2)](https://github.com/MagicTINTIN/Valser/commit/353edd2b8d44da31608aa2f94a2dd580a0dc46bb)</small></small>
 
 ### 🎨 Style
 
