@@ -11,7 +11,7 @@ version = "0.2.0"
 edition = "2021"
 
 [package.metadata.release]
-pre-release-hook = ["git", "cliff", "-o", "CHANGELOG.md"]
+pre-release-hook = ["git", "cliff", "-o", "CHANGELOG.md", "--tag", "{{tag_name}}"]
 pre-release-commit-message = "chore(release): {{version}}"
 tag-message = "Release {{version}}"
 tag-name = "v{{version}}"
