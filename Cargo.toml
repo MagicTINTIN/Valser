@@ -1,5 +1,12 @@
 [package]
 name = "valser"
+description = "Music player with niche and or useless features"
+
+license = "GPL-3.0-or-later"
+
+repository = "https://github.com/MagicTINTIN/Valser"
+documentation = "https://github.com/MagicTINTIN/Valser/wiki"
+
 version = "0.1.0"
 edition = "2021"
 
