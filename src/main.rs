@@ -1,18 +1,31 @@
 mod audio;
+mod mpris;
 mod playlist;
 mod ui;
-mod mpris;
+
+use std::path::PathBuf;
 
 use bevy::prelude::*;
 use bevy_egui::EguiPlugin;
 
 use audio::AudioPlugin;
+use dirs;
+use mpris::MprisPlugin;
 use playlist::PlaylistPlugin;
 use ui::UiPlugin;
-use mpris::MprisPlugin;
 mod opus_source;
+mod store;
+use store::Store;
 
 fn main() {
+    let data_dir = dirs::data_dir().unwrap_or_else(|| PathBuf::from(".")).join("Valser");
+    let config_dir = dirs::config_dir().unwrap_or_else(|| PathBuf::from(".")).join("Valser");
+
+    let store = match Store::open(&data_dir, &config_dir) {
+        Ok(s) => s,
+        Err(e) => { eprintln!("Failed to open store: {e}"); std::process::exit(1); }
+    };
+
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
@@ -28,6 +41,7 @@ fn main() {
         .add_plugins(PlaylistPlugin)
         .add_plugins(UiPlugin)
         .add_systems(Startup, setup)
+        .insert_non_send_resource(store)
         .run();
 }
 
