@@ -3,7 +3,7 @@ mod mpris;
 mod playlist;
 mod ui;
 
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Duration};
 
 use bevy::prelude::*;
 use bevy_egui::EguiPlugin;
@@ -17,16 +17,18 @@ mod opus_source;
 mod store;
 use store::Store;
 
-use crate::playlist::{FilterScope, Playlist, Track};
+use crate::{audio::AudioCommand, playlist::{FilterScope, Playlist, Track}};
 
 fn restore_state(
     store: NonSend<store::Store>,
     mut playlist: ResMut<Playlist>,
     mut ui_state: ResMut<ui::UiState>,
+    mut audio_cmd: ResMut<AudioCommand>,
 ) {
     let state = store.load_state();
 
     if !state.playlist_order.is_empty() {
+        // restore in saved order (post-shuffle etc.)
         if let Ok(records) = store.load_tracks_by_ids(&state.playlist_order) {
             let mut by_id: std::collections::HashMap<u64, _> =
                 records.into_iter().map(|r| (r.id, r)).collect();
@@ -34,6 +36,13 @@ fn restore_state(
                 if let Some(record) = by_id.remove(id) {
                     playlist.tracks.push(Track::from_record(record));
                 }
+            }
+        }
+    } else {
+        // first launch or state was cleared, load all known tracks from library
+        if let Ok(records) = store.load_all_tracks() {
+            for record in records {
+                playlist.tracks.push(Track::from_record(record));
             }
         }
     }
@@ -50,8 +59,37 @@ fn restore_state(
 
     // Restore current track index
     playlist.current = state.current_index;
+
+    if let Some((track_id, position_secs)) = store.load_position() {
+    if let Some(idx) = playlist.tracks.iter().position(|t| t.id == track_id) {
+        playlist.current = Some(idx);
+        audio_cmd.seek = Some(Duration::from_secs_f64(position_secs));
+    }
+}
 }
 
+fn save_state_on_exit(
+    mut exit_events: MessageReader<bevy::app::AppExit>,
+    store: NonSend<store::Store>,
+    playlist: Res<Playlist>,
+    ui_state: Res<ui::UiState>,
+) {
+    for _ in exit_events.read() {
+        let state = crate::store::AppState {
+            playlist_order: playlist.tracks.iter().map(|t| t.id).collect(),
+            current_index: playlist.current,
+            filter_text: ui_state.filter.clone(),
+            filter_scope: match ui_state.filter_scope {
+                FilterScope::Artist    => "artist".to_string(),
+                FilterScope::FileName  => "filename".to_string(),
+                _                      => "name".to_string(),
+            },
+            genre_whitelist: playlist.genre_whitelist.iter().cloned().collect(),
+            genre_blacklist: playlist.genre_blacklist.iter().cloned().collect(),
+        };
+        let _ = store.save_state(&state);
+    }
+}
 
 fn main() {
     let data_dir = dirs::data_dir().unwrap_or_else(|| PathBuf::from(".")).join("Valser");
@@ -77,6 +115,7 @@ fn main() {
         .add_plugins(PlaylistPlugin)
         .add_plugins(UiPlugin)
         .add_systems(Startup, (setup, restore_state).chain())
+        .add_systems(Last, save_state_on_exit)
         .insert_non_send_resource(store)
         .run();
 }

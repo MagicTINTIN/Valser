@@ -129,6 +129,7 @@ fn draw_ui(
                     } else {
                         playlist.toggle_whitelist(&genre);
                     }
+                    let _ = store.save_state(&build_app_state(&playlist, &ui_state));
                 }
 
                 if !playlist.genre_whitelist.is_empty() || !playlist.genre_blacklist.is_empty() {
@@ -155,10 +156,10 @@ fn draw_ui(
             // });
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui.button("🗀 Add Directory").clicked() {
-                    add_directory_action(&mut playlist, &*store);
+                    add_directory_action(&mut playlist, &*store, &ui_state);
                 }
                 if ui.button("➕ Add Files").clicked() {
-                    add_files_action(&mut playlist, &*store);
+                    add_files_action(&mut playlist, &*store, &ui_state);
                 }
             });
         });
@@ -280,10 +281,14 @@ fn draw_ui(
                     }
                     Some(PlaylistAction::Remove(i)) => {
                         let was_current = playlist.current == Some(i);
+                        if let Some(track) = playlist.tracks.get(i) {
+                            let _ = store.remove_track(track.id);
+                        }
                         playlist.remove_track(i);
                         if was_current {
                             audio_cmd.stop = true;
                         }
+                        let _ = store.save_state(&build_app_state(&playlist, &ui_state));
                     }
                     None => {}
                 }
@@ -455,6 +460,7 @@ fn handle_shortcuts(
     keys: Res<ButtonInput<KeyCode>>,
     mut playlist: ResMut<Playlist>,
     mut audio_cmd: ResMut<AudioCommand>,
+    ui_state: ResMut<UiState>,
     playback_state: Res<PlaybackState>,
     playback_info: Res<PlaybackInfo>,
     mut contexts: EguiContexts,
@@ -489,25 +495,33 @@ fn handle_shortcuts(
         }
         return;
     }
-    
+
     if keys.pressed(KeyCode::ArrowRight) {
-        let new_pos = playback_info.position.saturating_add(Duration::from_millis(500));
+        let new_pos = playback_info
+            .position
+            .saturating_add(Duration::from_millis(500));
         audio_cmd.seek = Some(new_pos);
         return;
     }
     if keys.pressed(KeyCode::ArrowLeft) {
-        let new_pos = playback_info.position.saturating_sub(Duration::from_millis(500));
+        let new_pos = playback_info
+            .position
+            .saturating_sub(Duration::from_millis(500));
         audio_cmd.seek = Some(new_pos);
         return;
     }
-    
+
     if keys.just_pressed(KeyCode::KeyJ) {
-        let new_pos = playback_info.position.saturating_add(Duration::from_secs(10));
+        let new_pos = playback_info
+            .position
+            .saturating_add(Duration::from_secs(10));
         audio_cmd.seek = Some(new_pos);
         return;
     }
     if keys.just_pressed(KeyCode::KeyL) {
-        let new_pos = playback_info.position.saturating_sub(Duration::from_secs(10));
+        let new_pos = playback_info
+            .position
+            .saturating_sub(Duration::from_secs(10));
         audio_cmd.seek = Some(new_pos);
         return;
     }
@@ -532,19 +546,20 @@ fn handle_shortcuts(
 
     // Ctrl+Shift+O -> open folder (recursive)
     if ctrl && shift && keys.just_pressed(KeyCode::KeyO) {
-        add_directory_action(&mut playlist, &*store);
+        add_directory_action(&mut playlist, &*store, &ui_state);
         return; // avoid matching the plain Ctrl+O branch below
     }
 
     // Ctrl+O -> open files
     if ctrl && keys.just_pressed(KeyCode::KeyO) {
-        add_files_action(&mut playlist, &*store);
+        add_files_action(&mut playlist, &*store, &ui_state);
         return;
     }
 
     // Ctrl+S -> shuffle
     if ctrl && keys.just_pressed(KeyCode::KeyS) {
         playlist.shuffle();
+        let _ = store.save_state(&build_app_state(&playlist, &ui_state));
         return;
     }
 }
@@ -557,7 +572,7 @@ enum PlaylistAction {
     Remove(usize),
 }
 
-fn add_files_action(playlist: &mut ResMut<Playlist>, store: &crate::store::Store) {
+fn add_files_action(playlist: &mut ResMut<Playlist>, store: &crate::store::Store, ui_state: &UiState) {
     if let Some(paths) = rfd::FileDialog::new()
         .set_title("Add audio files")
         .add_filter(
@@ -567,18 +582,35 @@ fn add_files_action(playlist: &mut ResMut<Playlist>, store: &crate::store::Store
         .pick_files()
     {
         playlist.add_tracks(paths, store);
+        let _ = store.save_state(&build_app_state(&playlist, &ui_state));
         if playlist.current.is_none() && !playlist.tracks.is_empty() {
             playlist.current = Some(0);
         }
     }
 }
 
-fn add_directory_action(playlist: &mut ResMut<Playlist>, store: &crate::store::Store) {
+fn add_directory_action(playlist: &mut ResMut<Playlist>, store: &crate::store::Store, ui_state: &UiState) {
     if let Some(dir) = rfd::FileDialog::new().pick_folder() {
         playlist.add_directory_recursive(&dir, store);
+        let _ = store.save_state(&build_app_state(&playlist, &ui_state));
         if playlist.current.is_none() && !playlist.tracks.is_empty() {
             playlist.current = Some(0);
         }
+    }
+}
+
+fn build_app_state(playlist: &Playlist, ui_state: &UiState) -> crate::store::AppState {
+    crate::store::AppState {
+        playlist_order: playlist.tracks.iter().map(|t| t.id).collect(),
+        current_index: playlist.current,
+        filter_text: ui_state.filter.clone(),
+        filter_scope: match ui_state.filter_scope {
+            FilterScope::TrackName => "name".to_string(),
+            FilterScope::Artist    => "artist".to_string(),
+            FilterScope::FileName  => "filename".to_string(),
+        },
+        genre_whitelist: playlist.genre_whitelist.iter().cloned().collect(),
+        genre_blacklist: playlist.genre_blacklist.iter().cloned().collect(),
     }
 }
 
