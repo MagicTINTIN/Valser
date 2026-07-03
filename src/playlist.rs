@@ -19,6 +19,7 @@ impl Default for FilterScope {
 /// Represents a single track in the playlist.
 #[derive(Debug, Clone)]
 pub struct Track {
+    pub id: u64,
     pub path: PathBuf,
     pub name: String,          // filename without extension (fallback display)
     pub title: Option<String>, // from tags
@@ -50,11 +51,15 @@ impl Track {
             {
                 title = tag.title().map(|s| s.to_string());
                 artist = tag.artist().map(|s| s.to_string());
-                genres = tag.get_strings(lofty::tag::ItemKey::Genre).map(|g| g.trim().to_string()).collect();
+                genres = tag
+                    .get_strings(lofty::tag::ItemKey::Genre)
+                    .map(|g| g.trim().to_string())
+                    .collect();
             }
         }
 
         Self {
+            id: 0, // placeholder
             path,
             name,
             title,
@@ -91,6 +96,30 @@ impl Track {
             FilterScope::FileName => self.name.to_lowercase().contains(&q),
         }
     }
+
+    pub fn to_record(&self) -> crate::store::TrackRecord {
+        crate::store::TrackRecord {
+            id: self.id,
+            path: self.path.to_string_lossy().to_string(),
+            name: self.name.clone(),
+            title: self.title.clone(),
+            artist: self.artist.clone(),
+            genres: self.genres.clone(),
+            duration_secs: self.duration.map(|d| d.as_secs_f64()),
+        }
+    }
+
+    pub fn from_record(record: crate::store::TrackRecord) -> Self {
+        Self {
+            id: record.id,
+            path: PathBuf::from(&record.path),
+            name: record.name,
+            title: record.title,
+            artist: record.artist,
+            genres: record.genres,
+            duration: record.duration_secs.map(Duration::from_secs_f64),
+        }
+    }
 }
 
 /// The global playlist and playback state.
@@ -106,24 +135,28 @@ pub struct Playlist {
 }
 
 impl Playlist {
-    pub fn add_tracks(&mut self, paths: Vec<PathBuf>) {
+    pub fn add_tracks(&mut self, paths: Vec<PathBuf>, store: &crate::store::Store) {
         for path in paths {
             if is_supported_format(&path) {
-                self.tracks.push(Track::new(path));
+                let mut track = Track::new(path);
+                if let Ok(id) = store.insert_track(&track.to_record()) {
+                    track.id = id;
+                    self.tracks.push(track);
+                }
             }
         }
     }
 
     /// Recursively scans a directory and adds every supported audio file found.
-    pub fn add_directory_recursive(&mut self, dir: &std::path::Path) {
+    pub fn add_directory_recursive(&mut self, dir: &std::path::Path, store: &crate::store::Store) {
         let paths: Vec<PathBuf> = walkdir::WalkDir::new(dir)
             .into_iter()
-            .filter_map(|entry| entry.ok())
-            .filter(|entry| entry.file_type().is_file())
-            .map(|entry| entry.into_path())
-            .filter(|path| is_supported_format(path))
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_type().is_file())
+            .map(|e| e.into_path())
+            .filter(|p| is_supported_format(p))
             .collect();
-        self.add_tracks(paths);
+        self.add_tracks(paths, store);
     }
 
     pub fn remove_track(&mut self, index: usize) {

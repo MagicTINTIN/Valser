@@ -1,4 +1,4 @@
-use redb::{Database, ReadableTable, TableDefinition};
+use redb::{Database, ReadableDatabase, ReadableTable, TableDefinition};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -37,9 +37,9 @@ pub struct AppState {
 }
 
 pub struct Store {
-    library: Database, // all the tracks added in the player
-    playback: Database, // all tracks passing filters
-    state_path: PathBuf, // player state file path
+    library: Database,      // all the tracks added in the player
+    playback: Database,     // all tracks passing filters
+    state_path: PathBuf,    // player state file path
     settings_path: PathBuf, // app settings file path
 }
 
@@ -69,5 +69,134 @@ impl Store {
             state_path: data_dir.join("state.json"),
             settings_path: config_dir.join("settings.json"),
         })
+    }
+
+    // --------------------------------------------------------------------------
+    // Track library
+
+    /// Insert a track, returning its assigned ID. Skips if path already exists.
+    pub fn insert_track(&self, record: &TrackRecord) -> Result<u64, Box<dyn std::error::Error>> {
+        // check for duplicates by path
+        if let Some(id) = self.find_track_by_path(&record.path)? {
+            return Ok(id);
+        }
+
+        let tx = self.library.begin_write()?;
+        let id = {
+            let mut meta = tx.open_table(META)?;
+            let next = meta.get("next_id")?.map(|v| v.value()).unwrap_or(1);
+            meta.insert("next_id", next + 1)?;
+            next
+        };
+        {
+            let mut tracks = tx.open_table(TRACKS)?;
+            let mut r = record.clone();
+            r.id = id;
+            tracks.insert(id, serde_json::to_string(&r)?.as_str())?;
+        }
+        tx.commit()?;
+        Ok(id)
+    }
+
+    pub fn remove_track(&self, id: u64) -> Result<(), Box<dyn std::error::Error>> {
+        let tx = self.library.begin_write()?;
+        {
+            let mut tracks = tx.open_table(TRACKS)?;
+            tracks.remove(id)?;
+        } // tracks drops here, releasing the borrow on tx
+        tx.commit()?;
+        Ok(())
+    }
+
+    pub fn load_tracks_by_ids(
+        &self,
+        ids: &[u64],
+    ) -> Result<Vec<TrackRecord>, Box<dyn std::error::Error>> {
+        let tx = self.library.begin_read()?;
+        let tracks = tx.open_table(TRACKS)?;
+        let mut result = Vec::with_capacity(ids.len());
+        for &id in ids {
+            if let Some(v) = tracks.get(id)? {
+                if let Ok(r) = serde_json::from_str::<TrackRecord>(v.value()) {
+                    result.push(r);
+                }
+            }
+        }
+        Ok(result)
+    }
+
+    pub fn load_all_tracks(&self) -> Result<Vec<TrackRecord>, Box<dyn std::error::Error>> {
+        let tx = self.library.begin_read()?;
+        let tracks = tx.open_table(TRACKS)?;
+        let mut result = Vec::new();
+        for item in tracks.iter()? {
+            let (_, v) = item?;
+            if let Ok(r) = serde_json::from_str::<TrackRecord>(v.value()) {
+                result.push(r);
+            }
+        }
+        Ok(result)
+    }
+
+    fn find_track_by_path(&self, path: &str) -> Result<Option<u64>, Box<dyn std::error::Error>> {
+        let tx = self.library.begin_read()?;
+        let tracks = tx.open_table(TRACKS)?;
+        for item in tracks.iter()? {
+            let (k, v) = item?;
+            if let Ok(r) = serde_json::from_str::<TrackRecord>(v.value()) {
+                if r.path == path {
+                    return Ok(Some(k.value()));
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    // --------------------------------------------------------------------------
+    // App state (playlist order + filters)
+
+    pub fn save_state(&self, state: &AppState) -> Result<(), Box<dyn std::error::Error>> {
+        let json = serde_json::to_string_pretty(state)?;
+        // Write to a temp file then rename for atomic replace.
+        let tmp = self.state_path.with_extension("json.tmp");
+        std::fs::write(&tmp, &json)?;
+        std::fs::rename(&tmp, &self.state_path)?;
+        Ok(())
+    }
+
+    pub fn load_state(&self) -> AppState {
+        std::fs::read_to_string(&self.state_path)
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_default()
+    }
+
+    // --------------------------------------------------------------------------
+    // Playback position written every few seconds, very cheap
+
+    /// Non-durable write
+    pub fn save_position(
+        &self,
+        track_id: u64,
+        position_secs: f64,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut tx = self.playback.begin_write()?;
+        {
+            let mut table = tx.open_table(PLAYBACK)?;
+            table.insert("track_id", track_id)?;
+            table.insert("position_secs", position_secs.to_bits())?;
+        }
+        // Durability::None = no fsync, fastest write, survives normal exit but not a hard power loss
+        tx.set_durability(redb::Durability::None)?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    pub fn load_position(&self) -> Option<(u64, f64)> {
+        let tx = self.playback.begin_read().ok()?;
+        let table = tx.open_table(PLAYBACK).ok()?;
+        let track_id = table.get("track_id").ok()??.value();
+        let pos_bits = table.get("position_secs").ok()??.value();
+        Some((track_id, f64::from_bits(pos_bits)))
     }
 }

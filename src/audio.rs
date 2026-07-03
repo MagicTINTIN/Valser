@@ -1,5 +1,6 @@
 use bevy::log::error;
 use bevy::prelude::*;
+use bevy::time::common_conditions::on_timer;
 use rodio::source::Source;
 use rodio::{Decoder, DeviceSinkBuilder, MixerDeviceSink, Player};
 use std::fs::File;
@@ -219,7 +220,7 @@ fn update_audio(
 
     if *playback_state == PlaybackState::Playing {
         playback_info.position = audio.position();
-        
+
         if let Some(tx) = &mpris_tx {
             let _ = tx.0.send(crate::mpris::MprisStateUpdate::Position(
                 playback_info.position.as_secs_f64(),
@@ -239,6 +240,22 @@ fn update_audio(
     }
 }
 
+fn save_playback_position(
+    playlist: Res<crate::playlist::Playlist>,
+    playback_info: Res<PlaybackInfo>,
+    playback_state: Res<PlaybackState>,
+    store: NonSend<crate::store::Store>,
+) {
+    if *playback_state != PlaybackState::Playing {
+        return;
+    }
+    if let Some(i) = playlist.current {
+        if let Some(track) = playlist.tracks.get(i) {
+            let _ = store.save_position(track.id, playback_info.position.as_secs_f64());
+        }
+    }
+}
+
 // --------------------------------------------------------------------------
 // Plugin
 
@@ -251,6 +268,10 @@ impl Plugin for AudioPlugin {
             .init_resource::<PlaybackInfo>()
             .add_message::<TrackFinished>()
             .add_systems(Startup, setup_audio)
-            .add_systems(Update, update_audio);
+            .add_systems(Update, update_audio)
+            .add_systems(
+                Update,
+                save_playback_position.run_if(on_timer(std::time::Duration::from_secs(5))),
+            );
     }
 }

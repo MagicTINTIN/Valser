@@ -78,6 +78,7 @@ fn draw_ui(
     mut ui_state: ResMut<UiState>,
     playback_info: Res<PlaybackInfo>,
     playback_state: Res<PlaybackState>,
+    store: NonSend<crate::store::Store>,
 ) -> Result {
     let ctx = contexts.ctx_mut()?;
     setup_custom_style(&ctx);
@@ -154,10 +155,10 @@ fn draw_ui(
             // });
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui.button("🗀 Add Directory").clicked() {
-                    add_directory_action(&mut playlist);
+                    add_directory_action(&mut playlist, &*store);
                 }
                 if ui.button("➕ Add Files").clicked() {
-                    add_files_action(&mut playlist);
+                    add_files_action(&mut playlist, &*store);
                 }
             });
         });
@@ -457,6 +458,7 @@ fn handle_shortcuts(
     playback_state: Res<PlaybackState>,
     playback_info: Res<PlaybackInfo>,
     mut contexts: EguiContexts,
+    store: NonSend<crate::store::Store>,
 ) {
     // Don't steal keystrokes while the user is typing in a text field.
     if let Ok(ctx) = contexts.ctx_mut() {
@@ -530,13 +532,13 @@ fn handle_shortcuts(
 
     // Ctrl+Shift+O -> open folder (recursive)
     if ctrl && shift && keys.just_pressed(KeyCode::KeyO) {
-        add_directory_action(&mut playlist);
+        add_directory_action(&mut playlist, &*store);
         return; // avoid matching the plain Ctrl+O branch below
     }
 
     // Ctrl+O -> open files
     if ctrl && keys.just_pressed(KeyCode::KeyO) {
-        add_files_action(&mut playlist);
+        add_files_action(&mut playlist, &*store);
         return;
     }
 
@@ -555,7 +557,7 @@ enum PlaylistAction {
     Remove(usize),
 }
 
-fn add_files_action(playlist: &mut ResMut<Playlist>) {
+fn add_files_action(playlist: &mut ResMut<Playlist>, store: &crate::store::Store) {
     if let Some(paths) = rfd::FileDialog::new()
         .set_title("Add audio files")
         .add_filter(
@@ -564,16 +566,16 @@ fn add_files_action(playlist: &mut ResMut<Playlist>) {
         )
         .pick_files()
     {
-        playlist.add_tracks(paths);
+        playlist.add_tracks(paths, store);
         if playlist.current.is_none() && !playlist.tracks.is_empty() {
             playlist.current = Some(0);
         }
     }
 }
 
-fn add_directory_action(playlist: &mut ResMut<Playlist>) {
+fn add_directory_action(playlist: &mut ResMut<Playlist>, store: &crate::store::Store) {
     if let Some(dir) = rfd::FileDialog::new().pick_folder() {
-        playlist.add_directory_recursive(&dir);
+        playlist.add_directory_recursive(&dir, store);
         if playlist.current.is_none() && !playlist.tracks.is_empty() {
             playlist.current = Some(0);
         }
