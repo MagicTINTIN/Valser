@@ -6,7 +6,7 @@ mod ui;
 
 use std::{path::PathBuf, time::Duration};
 
-use bevy::prelude::*;
+use bevy::{prelude::*, winit::{UpdateMode, WinitSettings}};
 use bevy_egui::EguiPlugin;
 
 use audio::AudioPlugin;
@@ -113,6 +113,11 @@ fn main() {
     };
 
     App::new()
+        .insert_resource(WinitSettings {
+            // Render at max 30fps when focused, drop to 10fps when unfocused.
+            focused_mode: UpdateMode::reactive(Duration::from_millis(33)),
+            unfocused_mode: UpdateMode::reactive_low_power(Duration::from_millis(100)),
+        })
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "Valser".to_string(),
