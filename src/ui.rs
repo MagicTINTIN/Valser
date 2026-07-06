@@ -150,15 +150,27 @@ fn draw_ui(
         ui.horizontal(|ui| {
             ui.heading("🎵 Valser");
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.button("🗀 Add Directory").clicked() {
+                if ui.button("🗀 Add Directory")
+                    .on_hover_text("Add directory to playlist (Ctrl+Shift+O)").clicked() {
                     if let (Some(loader), Some(loading)) = (&loader, &mut loading) {
                         add_directory_action(loader, loading);
                     }
                 }
-                if ui.button("➕ Add Files").clicked() {
+                if ui.button("➕ Add Files")
+                    .on_hover_text("Add tracks to playlist (Ctrl+O)").clicked() {
                     if let (Some(loader), Some(loading)) = (&loader, &mut loading) {
                         add_files_action(loader, loading);
                     }
+                }
+                if ui
+                    .button("🗑 Clear")
+                    .clicked()
+                {
+                    let _ = store.clear_all_tracks();
+                    playlist.tracks.clear();
+                    playlist.current = None;
+                    audio_cmd.stop = true;
+                    save_state_needed = true;
                 }
             });
         });

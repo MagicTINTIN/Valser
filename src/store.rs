@@ -25,7 +25,7 @@ pub struct TrackRecord {
 /// Stored in state.json
 #[derive(Serialize, Deserialize, Default, Clone, Debug)]
 pub struct AppState {
-    /// Ordered list of track IDs — this IS the playlist order after shuffles.
+    /// Ordered list of track IDs, this is the playlist order after shuffles.
     pub playlist_order: Vec<u64>,
     pub current_index: Option<usize>,
     pub filter_text: String,
@@ -125,6 +125,22 @@ impl Store {
             let mut tracks = tx.open_table(TRACKS)?;
             tracks.remove(id)?;
         } // tracks drops here, releasing the borrow on tx
+        tx.commit()?;
+        Ok(())
+    }
+
+    pub fn clear_all_tracks(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let tx = self.library.begin_write()?;
+        {
+            // delete_table removes all data in one shot, no per-row iteration
+            if tx.list_tables()?.any(|t| t.name() == "tracks") {
+                tx.delete_table(tx.open_table(TRACKS)?)?;
+            }
+            // Recreate it empty and reset the id counter
+            tx.open_table(TRACKS)?;
+            let mut meta = tx.open_table(META)?;
+            meta.insert("next_id", 1u64)?;
+        }
         tx.commit()?;
         Ok(())
     }
