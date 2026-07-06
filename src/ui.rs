@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use crate::audio::{AudioCommand, PlaybackInfo, PlaybackState, TrackFinished};
 use crate::loader::{LoadRequest, LoaderChannel, LoadingState};
-use crate::playlist::{FilterScope, Playlist, Track};
+use crate::playlist::{FilterScope, GenreCountCache, Playlist, Track};
 
 // ---------------------------------------------------------------------------
 // UI state
@@ -81,6 +81,7 @@ fn draw_ui(
     playback_info: Res<PlaybackInfo>,
     playback_state: Res<PlaybackState>,
     store: NonSend<crate::store::Store>,
+    genre_cache: Res<GenreCountCache>,
     loader: Option<Res<LoaderChannel>>,
     mut loading: Option<ResMut<LoadingState>>,
 ) -> Result {
@@ -95,7 +96,7 @@ fn draw_ui(
     // -----------------------------------------------------------------------
     // Genre side panel
     if ui_state.show_genre_panel {
-        let counts = playlist.genre_counts();
+        let counts = &genre_cache.counts;
         let whitelist_snap = playlist.genre_whitelist.clone();
         let blacklist_snap = playlist.genre_blacklist.clone();
 
@@ -112,7 +113,7 @@ fn draw_ui(
                 ui.separator();
 
                 egui::ScrollArea::vertical().show(ui, |ui| {
-                    for (genre, count) in &counts {
+                    for (genre, count) in counts {
                         let is_white = whitelist_snap.contains(genre);
                         let is_black = blacklist_snap.contains(genre);
 

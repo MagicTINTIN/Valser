@@ -3,6 +3,22 @@ use std::collections::{BTreeMap, HashSet};
 use std::path::PathBuf;
 use std::time::Duration;
 
+/// Cached genre counts
+#[derive(Resource, Default)]
+pub struct GenreCountCache {
+    pub counts: std::collections::BTreeMap<String, usize>,
+    /// Generation counter, bump whenever tracks are added/removed or genre filters change.
+    pub dirty: bool,
+}
+
+pub fn update_genre_cache(playlist: Res<Playlist>, mut cache: ResMut<GenreCountCache>) {
+    // Res<Playlist> gives us change detection for free.
+    if playlist.is_changed() || cache.dirty {
+        cache.counts = playlist.genre_counts();
+        cache.dirty = false;
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum FilterScope {
     TrackName, // tag title, falls back to filename
@@ -253,6 +269,8 @@ pub struct PlaylistPlugin;
 
 impl Plugin for PlaylistPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Playlist>();
+        app.init_resource::<Playlist>()
+            .init_resource::<GenreCountCache>()
+            .add_systems(Update, update_genre_cache);
     }
 }
