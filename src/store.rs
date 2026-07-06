@@ -38,7 +38,7 @@ pub struct Store {
     library: Database,      // all the tracks added in the player
     playback: Database,     // all tracks passing filters
     state_path: PathBuf,    // player state file path
-    settings_path: PathBuf, // app settings file path
+    _settings_path: PathBuf, // app settings file path
 }
 
 impl Store {
@@ -65,7 +65,7 @@ impl Store {
             library,
             playback,
             state_path: data_dir.join("state.json"),
-            settings_path: config_dir.join("settings.json"),
+            _settings_path: config_dir.join("settings.json"),
         })
     }
 
