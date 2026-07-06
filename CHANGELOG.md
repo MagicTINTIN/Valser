@@ -4,11 +4,33 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 ---
-## [\<0.2.1\>](https://github.com/MagicTINTIN/Valser/releases/v0.2.1) - 2026-06-30 <small><small><small>[(compare)](https://github.com/MagicTINTIN/Valser/compare/v0.2.0..v0.2.1)</small></small></small>
+## [\<0.2.2\>](https://github.com/MagicTINTIN/Valser/releases/v0.2.2) - 2026-07-06 <small><small><small>[(compare)](https://github.com/MagicTINTIN/Valser/compare/v0.2.0..v0.2.2)</small></small></small>
+
+### 🚀 Features
+
+- save state each 5s <small><small>[(29c541f)](https://github.com/MagicTINTIN/Valser/commit/29c541f7dad741ddd1cbf0a50aebaba7651afe7b)</small></small>
+- saving states on actions <small>[**\[#14\]**](https://github.com/MagicTINTIN/Valser/issues/14)</small> <small><small>[(4593b88)](https://github.com/MagicTINTIN/Valser/commit/4593b889929ffd0fd02770da4eb3acb9c345de85)</small></small>
+- clear entire playlist <small><small>[(cc3bc1e)](https://github.com/MagicTINTIN/Valser/commit/cc3bc1e0c721e49c1098faf818e36ccb7c3ffe77)</small></small>
 
 ### 🐛 Bug Fixes
 
 - using pre release hook of git cliff <small><small>[(2154694)](https://github.com/MagicTINTIN/Valser/commit/21546942beccbcef80e160cbc6840b983a437361)</small></small>
+
+### ⚡ Performance
+
+- improving playlist scrollpane <small><small>[(fde9cb4)](https://github.com/MagicTINTIN/Valser/commit/fde9cb43e36f8c8b11d3a4624870cba8c9273934)</small></small>
+- parallel loader for heavy number of tracks <small><small>[(7d5a757)](https://github.com/MagicTINTIN/Valser/commit/7d5a7572983e40b1a3ea391bd2d350747f96ab54)</small></small>
+- cap fps to 30 when focused and less on low power <small><small>[(71c446a)](https://github.com/MagicTINTIN/Valser/commit/71c446a2df4c3cb4bd621a4767b91a9258eab4d3)</small></small>
+- caching genre count <small><small>[(7a671f5)](https://github.com/MagicTINTIN/Valser/commit/7a671f526dcdd895a7050cc25ac53c86881d1ef6)</small></small>
+
+### ⚙️ Miscellaneous Chores
+
+- **(release)** 0.2.1 <small><small>[(fd590b9)](https://github.com/MagicTINTIN/Valser/commit/fd590b938f88f02ca8f7ee12ccd3377a77abdb6b)</small></small>
+- adding configuration definitions and locations <small><small>[(a692794)](https://github.com/MagicTINTIN/Valser/commit/a69279496bd80d96814607a59d4e5e68ceda0b8e)</small></small>
+
+### 🎨 Style
+
+- unused settings path fix <small><small>[(f0f4e77)](https://github.com/MagicTINTIN/Valser/commit/f0f4e7783a9060c15fe8502a29d5391cba54f9f7)</small></small>
 
 ### 🏗️ Build
 

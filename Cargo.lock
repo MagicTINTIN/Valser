@@ -5192,7 +5192,7 @@ dependencies = [
 
 [[package]]
 name = "valser"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "bevy",
  "bevy_egui",
