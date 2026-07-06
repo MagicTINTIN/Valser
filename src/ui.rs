@@ -5,7 +5,7 @@ use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use std::time::Duration;
 
 use crate::audio::{AudioCommand, PlaybackInfo, PlaybackState, TrackFinished};
-use crate::playlist::{FilterScope, Playlist};
+use crate::playlist::{FilterScope, Playlist, Track};
 
 // ---------------------------------------------------------------------------
 // UI state
@@ -83,7 +83,18 @@ fn draw_ui(
     let ctx = contexts.ctx_mut()?;
     setup_custom_style(&ctx);
 
+    let mut genre_action: Option<(String, bool)> = None;
+    let mut clear_genre_filters = false;
+    let mut playlist_action: Option<PlaylistAction> = None;
+    let mut save_state_needed = false;
+
+    // -----------------------------------------------------------------------
+    // Genre side panel
     if ui_state.show_genre_panel {
+        let counts = playlist.genre_counts();
+        let whitelist_snap = playlist.genre_whitelist.clone();
+        let blacklist_snap = playlist.genre_blacklist.clone();
+
         egui::SidePanel::left("genre_panel")
             .resizable(true)
             .default_width(200.0)
@@ -96,13 +107,10 @@ fn draw_ui(
                 );
                 ui.separator();
 
-                let counts = playlist.genre_counts();
-                let mut pending_action: Option<(String, bool)> = None; // (genre, is_shift)
-
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     for (genre, count) in &counts {
-                        let is_white = playlist.genre_whitelist.contains(genre);
-                        let is_black = playlist.genre_blacklist.contains(genre);
+                        let is_white = whitelist_snap.contains(genre);
+                        let is_black = blacklist_snap.contains(genre);
 
                         let color = if is_white {
                             egui::Color32::from_rgb(100, 200, 100)
@@ -118,48 +126,33 @@ fn draw_ui(
 
                         if response.clicked() {
                             let shift = ui.input(|i| i.modifiers.shift);
-                            pending_action = Some((genre.clone(), shift));
+                            genre_action = Some((genre.clone(), shift));
                         }
                     }
                 });
 
-                if let Some((genre, shift)) = pending_action {
-                    if shift {
-                        playlist.toggle_blacklist(&genre);
-                    } else {
-                        playlist.toggle_whitelist(&genre);
-                    }
-                    let _ = store.save_state(&build_app_state(&playlist, &ui_state));
-                }
-
-                if !playlist.genre_whitelist.is_empty() || !playlist.genre_blacklist.is_empty() {
+                if !whitelist_snap.is_empty() || !blacklist_snap.is_empty() {
                     ui.separator();
                     if ui.button("Clear filters").clicked() {
-                        playlist.genre_whitelist.clear();
-                        playlist.genre_blacklist.clear();
+                        clear_genre_filters = true;
                     }
                 }
             });
     }
 
+    // -----------------------------------------------------------------------
+    // Central panel
     egui::CentralPanel::default().show(ctx, |ui| {
-        // egui::TopBottomPanel::top("header").show(ctx, |ui| {
-        // Top bar
         ui.horizontal(|ui| {
             ui.heading("🎵 Valser");
-            // ui.horizontal(|ui| {
-            //     ui.label("🔍");
-            //     ui.text_edit_singleline(&mut ui_state.filter);
-            //     if !ui_state.filter.is_empty() && ui.small_button("✖").clicked() {
-            //         ui_state.filter.clear();
-            //     }
-            // });
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui.button("🗀 Add Directory").clicked() {
                     add_directory_action(&mut playlist, &*store, &ui_state);
+                    save_state_needed = true;
                 }
                 if ui.button("➕ Add Files").clicked() {
                     add_files_action(&mut playlist, &*store, &ui_state);
+                    save_state_needed = true;
                 }
             });
         });
@@ -185,7 +178,11 @@ fn draw_ui(
                         FilterScope::TrackName,
                         "Track name",
                     );
-                    ui.selectable_value(&mut ui_state.filter_scope, FilterScope::Artist, "Artist");
+                    ui.selectable_value(
+                        &mut ui_state.filter_scope,
+                        FilterScope::Artist,
+                        "Artist",
+                    );
                     ui.selectable_value(
                         &mut ui_state.filter_scope,
                         FilterScope::FileName,
@@ -196,51 +193,47 @@ fn draw_ui(
             ui.toggle_value(&mut ui_state.show_genre_panel, "🏷 Genres");
         });
 
-        // ui.separator();
         ui.add(egui::Separator::default().shrink(20_f32));
-        // ui.separator().labelled_by("Playlist".into());
 
-        // Playlist
-        let available_height = ui.available_height() - 120.0;
-        // egui::CentralPanel::default().show(ctx, |ui| {
-        egui::ScrollArea::vertical()
-            .max_height(available_height)
-            .show(ui, |ui| {
-                let mut action: Option<PlaylistAction> = None;
-
-                // let filter_lower = ui_state.filter.to_lowercase();
-                for (i, track) in playlist.tracks.iter().enumerate() {
-                    // if !filter_lower.is_empty()
-                    //     && !track.name.to_lowercase().contains(&filter_lower)
-                    // {
-                    //     continue;
-                    // }
-                    if !track.matches_filter(&ui_state.filter, ui_state.filter_scope) {
-                        continue;
-                    }
-                    if !playlist.genre_visible(track) {
-                        continue;
-                    }
+        // Snapshot visible tracks, indices into playlist.tracks
+        let visible_tracks: Vec<(usize, String, Option<std::time::Duration>, bool, bool)> =
+            playlist
+                .tracks
+                .iter()
+                .enumerate()
+                .filter(|(_, t)| {
+                    t.matches_filter(&ui_state.filter, ui_state.filter_scope)
+                        && playlist.genre_visible(t)
+                })
+                .map(|(i, t)| {
                     let is_current = playlist.current == Some(i);
                     let is_playing = is_current && *playback_state == PlaybackState::Playing;
+                    (i, t.display_name().to_string(), t.duration, is_current, is_playing)
+                })
+                .collect();
+
+        let available_height = ui.available_height() - 120.0;
+        let row_height = 22.0;
+
+        egui::ScrollArea::vertical()
+            .max_height(available_height)
+            .show_rows(ui, row_height, visible_tracks.len(), |ui, row_range| {
+                for idx in row_range {
+                    let (i, display_name, duration, is_current, is_playing) =
+                        &visible_tracks[idx];
 
                     ui.horizontal(|ui| {
-                        let indicator = if is_playing {
-                            "▶"
-                        } else if is_current {
-                            "◼"
-                        } else {
-                            "  "
-                        };
-                        ui.label(egui::RichText::new(indicator).color(if is_current {
+                        let indicator =
+                            if *is_playing { "▶" } else if *is_current { "◼" } else { "  " };
+                        ui.label(egui::RichText::new(indicator).color(if *is_current {
                             egui::Color32::from_rgb(200, 75, 75)
                         } else {
                             egui::Color32::GRAY
                         }));
 
                         let label =
-                            egui::RichText::new(format!("{}. {}", i + 1, track.display_name()))
-                                .color(if is_current {
+                            egui::RichText::new(format!("{}. {}", i + 1, display_name))
+                                .color(if *is_current {
                                     egui::Color32::WHITE
                                 } else {
                                     egui::Color32::LIGHT_GRAY
@@ -250,89 +243,56 @@ fn draw_ui(
                             .add(egui::Label::new(label).sense(egui::Sense::click()))
                             .double_clicked()
                         {
-                            action = Some(PlaylistAction::Play(i));
+                            playlist_action = Some(PlaylistAction::Play(*i));
                         }
 
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if ui
-                                .add(egui::Button::new("✖").small())
-                                .on_hover_text("Remove")
-                                .clicked()
-                            {
-                                action = Some(PlaylistAction::Remove(i));
-                            }
-                            if let Some(dur) = track.duration {
-                                ui.label(
-                                    egui::RichText::new(crate::playlist::Track::format_duration(
-                                        dur,
-                                    ))
-                                    .color(egui::Color32::GRAY),
-                                );
-                            }
-                        });
+                        ui.with_layout(
+                            egui::Layout::right_to_left(egui::Align::Center),
+                            |ui| {
+                                if ui
+                                    .add(egui::Button::new("✖").small())
+                                    .on_hover_text("Remove")
+                                    .clicked()
+                                {
+                                    playlist_action = Some(PlaylistAction::Remove(*i));
+                                }
+                                if let Some(dur) = duration {
+                                    ui.label(
+                                        egui::RichText::new(
+                                            Track::format_duration(*dur),
+                                        )
+                                        .color(egui::Color32::GRAY),
+                                    );
+                                }
+                            },
+                        );
                     });
-                }
-
-                match action {
-                    Some(PlaylistAction::Play(i)) => {
-                        let path = playlist.tracks[i].path.clone();
-                        playlist.current = Some(i);
-                        audio_cmd.play = Some(path);
-                    }
-                    Some(PlaylistAction::Remove(i)) => {
-                        let was_current = playlist.current == Some(i);
-                        if let Some(track) = playlist.tracks.get(i) {
-                            let _ = store.remove_track(track.id);
-                        }
-                        playlist.remove_track(i);
-                        if was_current {
-                            audio_cmd.stop = true;
-                        }
-                        let _ = store.save_state(&build_app_state(&playlist, &ui_state));
-                    }
-                    None => {}
                 }
 
                 if playlist.tracks.is_empty() {
                     ui.vertical_centered(|ui| {
                         ui.add_space(20.0);
                         ui.label(
-                            egui::RichText::new("No tracks. Click ➕ Add Files to get started.")
-                                .color(egui::Color32::GRAY),
+                            egui::RichText::new(
+                                "No tracks. Click ➕ Add Files to get started.",
+                            )
+                            .color(egui::Color32::GRAY),
                         );
                     });
                 }
             });
-        // });
 
         ui.separator();
 
         // Seek bar
-        let total_secs = playback_info
-            .duration
-            .map(|d| d.as_secs_f32())
-            .unwrap_or(0.0);
+        let total_secs = playback_info.duration.map(|d| d.as_secs_f32()).unwrap_or(0.0);
         let pos_secs = playback_info.position.as_secs_f32();
-
-        let mut seek_val = if ui_state.seeking {
-            ui_state.seek_preview
-        } else {
-            pos_secs
-        };
+        let mut seek_val = if ui_state.seeking { ui_state.seek_preview } else { pos_secs };
 
         ui.horizontal(|ui| {
-            ui.label(crate::playlist::Track::format_duration(
-                Duration::from_secs_f32(pos_secs.max(0.0)),
-            ));
-
+            ui.label(Track::format_duration(Duration::from_secs_f32(pos_secs.max(0.0))));
             ui.label("/");
-
-            ui.label(crate::playlist::Track::format_duration(
-                Duration::from_secs_f32(total_secs),
-            ));
-
-            // ui.style_mut().visuals.color
-
+            ui.label(Track::format_duration(Duration::from_secs_f32(total_secs)));
             ui.style_mut().spacing.slider_width = ui.available_width();
             let seek_slider = ui.add_enabled(
                 total_secs > 0.0,
@@ -365,35 +325,20 @@ fn draw_ui(
                 }
             }
 
-            let play_label = if *playback_state == PlaybackState::Playing {
-                "⏸"
-            } else {
-                "▶"
-            };
-            if ui
-                .button(play_label)
-                .on_hover_text("Play / Pause")
-                .clicked()
-            {
+            let play_label = if *playback_state == PlaybackState::Playing { "⏸" } else { "▶" };
+            if ui.button(play_label).on_hover_text("Play / Pause").clicked() {
                 match *playback_state {
                     PlaybackState::Stopped => {
-                        let idx = playlist.current.or_else(|| {
-                            if playlist.tracks.is_empty() {
-                                None
-                            } else {
-                                Some(0)
-                            }
-                        });
-                        // println!("Hey {}", idx.unwrap_or(0));
+                        let idx = playlist
+                            .current
+                            .or_else(|| if playlist.tracks.is_empty() { None } else { Some(0) });
                         if let Some(i) = idx {
                             let path = playlist.tracks[i].path.clone();
                             playlist.current = Some(i);
                             audio_cmd.play = Some(path);
                         }
                     }
-                    _ => {
-                        audio_cmd.toggle_pause = true;
-                    }
+                    _ => audio_cmd.toggle_pause = true,
                 }
             }
 
@@ -440,7 +385,7 @@ fn draw_ui(
                 if let Some(i) = playlist.current {
                     if let Some(track) = playlist.tracks.get(i) {
                         ui.label(
-                            egui::RichText::new(format!("♪ {}", &track.display_name()))
+                            egui::RichText::new(format!("♪ {}", track.display_name()))
                                 .color(egui::Color32::from_rgb(220, 75, 75))
                                 .small(),
                         );
@@ -449,6 +394,43 @@ fn draw_ui(
             });
         });
     });
+
+    // -----------------------------------------------------------------------
+    // Apply deferred actions
+
+    if let Some((genre, shift)) = genre_action {
+        if shift { playlist.toggle_blacklist(&genre); }
+        else     { playlist.toggle_whitelist(&genre); }
+        save_state_needed = true;
+    }
+
+    if clear_genre_filters {
+        playlist.genre_whitelist.clear();
+        playlist.genre_blacklist.clear();
+        save_state_needed = true;
+    }
+
+    match playlist_action {
+        Some(PlaylistAction::Play(i)) => {
+            let path = playlist.tracks[i].path.clone();
+            playlist.current = Some(i);
+            audio_cmd.play = Some(path);
+        }
+        Some(PlaylistAction::Remove(i)) => {
+            let was_current = playlist.current == Some(i);
+            if let Some(track) = playlist.tracks.get(i) {
+                let _ = store.remove_track(track.id);
+            }
+            playlist.remove_track(i);
+            if was_current { audio_cmd.stop = true; }
+            save_state_needed = true;
+        }
+        None => {}
+    }
+
+    if save_state_needed {
+        let _ = store.save_state(&build_app_state(&playlist, &ui_state));
+    }
 
     Ok(())
 }
@@ -572,7 +554,11 @@ enum PlaylistAction {
     Remove(usize),
 }
 
-fn add_files_action(playlist: &mut ResMut<Playlist>, store: &crate::store::Store, ui_state: &UiState) {
+fn add_files_action(
+    playlist: &mut ResMut<Playlist>,
+    store: &crate::store::Store,
+    ui_state: &UiState,
+) {
     if let Some(paths) = rfd::FileDialog::new()
         .set_title("Add audio files")
         .add_filter(
@@ -589,7 +575,11 @@ fn add_files_action(playlist: &mut ResMut<Playlist>, store: &crate::store::Store
     }
 }
 
-fn add_directory_action(playlist: &mut ResMut<Playlist>, store: &crate::store::Store, ui_state: &UiState) {
+fn add_directory_action(
+    playlist: &mut ResMut<Playlist>,
+    store: &crate::store::Store,
+    ui_state: &UiState,
+) {
     if let Some(dir) = rfd::FileDialog::new().pick_folder() {
         playlist.add_directory_recursive(&dir, store);
         let _ = store.save_state(&build_app_state(&playlist, &ui_state));
@@ -606,8 +596,8 @@ fn build_app_state(playlist: &Playlist, ui_state: &UiState) -> crate::store::App
         filter_text: ui_state.filter.clone(),
         filter_scope: match ui_state.filter_scope {
             FilterScope::TrackName => "name".to_string(),
-            FilterScope::Artist    => "artist".to_string(),
-            FilterScope::FileName  => "filename".to_string(),
+            FilterScope::Artist => "artist".to_string(),
+            FilterScope::FileName => "filename".to_string(),
         },
         genre_whitelist: playlist.genre_whitelist.iter().cloned().collect(),
         genre_blacklist: playlist.genre_blacklist.iter().cloned().collect(),
