@@ -1,4 +1,5 @@
 mod audio;
+mod loader;
 mod mpris;
 mod playlist;
 mod ui;
@@ -15,9 +16,13 @@ use playlist::PlaylistPlugin;
 use ui::UiPlugin;
 mod opus_source;
 mod store;
+use loader::LoaderPlugin;
 use store::Store;
 
-use crate::{audio::AudioCommand, playlist::{FilterScope, Playlist, Track}};
+use crate::{
+    audio::AudioCommand,
+    playlist::{FilterScope, Playlist, Track},
+};
 
 fn restore_state(
     store: NonSend<store::Store>,
@@ -52,20 +57,20 @@ fn restore_state(
     ui_state.filter = state.filter_text;
     // restore filter_scope from the string
     ui_state.filter_scope = match state.filter_scope.as_str() {
-        "artist"   => FilterScope::Artist,
+        "artist" => FilterScope::Artist,
         "filename" => FilterScope::FileName,
-        _          => FilterScope::TrackName,
+        _ => FilterScope::TrackName,
     };
 
     // Restore current track index
     playlist.current = state.current_index;
 
     if let Some((track_id, position_secs)) = store.load_position() {
-    if let Some(idx) = playlist.tracks.iter().position(|t| t.id == track_id) {
-        playlist.current = Some(idx);
-        audio_cmd.seek = Some(Duration::from_secs_f64(position_secs));
+        if let Some(idx) = playlist.tracks.iter().position(|t| t.id == track_id) {
+            playlist.current = Some(idx);
+            audio_cmd.seek = Some(Duration::from_secs_f64(position_secs));
+        }
     }
-}
 }
 
 fn save_state_on_exit(
@@ -80,9 +85,9 @@ fn save_state_on_exit(
             current_index: playlist.current,
             filter_text: ui_state.filter.clone(),
             filter_scope: match ui_state.filter_scope {
-                FilterScope::Artist    => "artist".to_string(),
-                FilterScope::FileName  => "filename".to_string(),
-                _                      => "name".to_string(),
+                FilterScope::Artist => "artist".to_string(),
+                FilterScope::FileName => "filename".to_string(),
+                _ => "name".to_string(),
             },
             genre_whitelist: playlist.genre_whitelist.iter().cloned().collect(),
             genre_blacklist: playlist.genre_blacklist.iter().cloned().collect(),
@@ -92,12 +97,19 @@ fn save_state_on_exit(
 }
 
 fn main() {
-    let data_dir = dirs::data_dir().unwrap_or_else(|| PathBuf::from(".")).join("Valser");
-    let config_dir = dirs::config_dir().unwrap_or_else(|| PathBuf::from(".")).join("Valser");
+    let data_dir = dirs::data_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("Valser");
+    let config_dir = dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("Valser");
 
     let store = match Store::open(&data_dir, &config_dir) {
         Ok(s) => s,
-        Err(e) => { eprintln!("Failed to open store: {e}"); std::process::exit(1); }
+        Err(e) => {
+            eprintln!("Failed to open store: {e}");
+            std::process::exit(1);
+        }
     };
 
     App::new()
@@ -114,6 +126,7 @@ fn main() {
         .add_plugins(MprisPlugin)
         .add_plugins(PlaylistPlugin)
         .add_plugins(UiPlugin)
+        .add_plugins(LoaderPlugin)
         .add_systems(Startup, (setup, restore_state).chain())
         .add_systems(Last, save_state_on_exit)
         .insert_non_send_resource(store)

@@ -1,4 +1,4 @@
-use redb::{Database, ReadableDatabase, ReadableTable, TableDefinition};
+use redb::{Database, ReadableDatabase, ReadableTable, TableDefinition, TableHandle};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -72,28 +72,51 @@ impl Store {
     // --------------------------------------------------------------------------
     // Track library
 
-    /// Insert a track, returning its assigned ID. Skips if path already exists.
-    pub fn insert_track(&self, record: &TrackRecord) -> Result<u64, Box<dyn std::error::Error>> {
-        // check for duplicates by path
-        if let Some(id) = self.find_track_by_path(&record.path)? {
-            return Ok(id);
-        }
-
-        let tx = self.library.begin_write()?;
-        let id = {
-            let mut meta = tx.open_table(META)?;
-            let next = meta.get("next_id")?.map(|v| v.value()).unwrap_or(1);
-            meta.insert("next_id", next + 1)?;
-            next
+    /// Insert many tracks in a single transaction. Returns a Vec of Option<u64>
+    /// Some(id) for newly inserted, None if already exists.
+    pub fn insert_tracks_batch(
+        &self,
+        records: &[TrackRecord],
+    ) -> Result<Vec<Option<u64>>, Box<dyn std::error::Error>> {
+        // First, collect all existing paths in one read transaction.
+        let existing: std::collections::HashMap<String, u64> = {
+            let tx = self.library.begin_read()?;
+            let table = tx.open_table(TRACKS)?;
+            let mut map = std::collections::HashMap::new();
+            for item in table.iter()? {
+                let (k, v) = item?;
+                if let Ok(r) = serde_json::from_str::<TrackRecord>(v.value()) {
+                    map.insert(r.path.clone(), k.value());
+                }
+            }
+            map
         };
+
+        // One write transaction for all new tracks.
+        let tx = self.library.begin_write()?;
+        let mut ids: Vec<Option<u64>> = Vec::with_capacity(records.len());
         {
-            let mut tracks = tx.open_table(TRACKS)?;
-            let mut r = record.clone();
-            r.id = id;
-            tracks.insert(id, serde_json::to_string(&r)?.as_str())?;
+            let mut meta_table = tx.open_table(META)?;
+            let mut tracks_table = tx.open_table(TRACKS)?;
+            let mut next_id = meta_table.get("next_id")?.map(|v| v.value()).unwrap_or(1);
+
+            for record in records {
+                if let Some(&existing_id) = existing.get(&record.path) {
+                    ids.push(Some(existing_id)); // already in DB, reuse id
+                    continue;
+                }
+                let id = next_id;
+                next_id += 1;
+                let mut r = record.clone();
+                r.id = id;
+                tracks_table.insert(id, serde_json::to_string(&r)?.as_str())?;
+                ids.push(Some(id));
+            }
+
+            meta_table.insert("next_id", next_id)?;
         }
         tx.commit()?;
-        Ok(id)
+        Ok(ids)
     }
 
     pub fn remove_track(&self, id: u64) -> Result<(), Box<dyn std::error::Error>> {
@@ -134,20 +157,6 @@ impl Store {
             }
         }
         Ok(result)
-    }
-
-    fn find_track_by_path(&self, path: &str) -> Result<Option<u64>, Box<dyn std::error::Error>> {
-        let tx = self.library.begin_read()?;
-        let tracks = tx.open_table(TRACKS)?;
-        for item in tracks.iter()? {
-            let (k, v) = item?;
-            if let Ok(r) = serde_json::from_str::<TrackRecord>(v.value()) {
-                if r.path == path {
-                    return Ok(Some(k.value()));
-                }
-            }
-        }
-        Ok(None)
     }
 
     // --------------------------------------------------------------------------

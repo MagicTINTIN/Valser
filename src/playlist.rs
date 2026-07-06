@@ -135,30 +135,6 @@ pub struct Playlist {
 }
 
 impl Playlist {
-    pub fn add_tracks(&mut self, paths: Vec<PathBuf>, store: &crate::store::Store) {
-        for path in paths {
-            if is_supported_format(&path) {
-                let mut track = Track::new(path);
-                if let Ok(id) = store.insert_track(&track.to_record()) {
-                    track.id = id;
-                    self.tracks.push(track);
-                }
-            }
-        }
-    }
-
-    /// Recursively scans a directory and adds every supported audio file found.
-    pub fn add_directory_recursive(&mut self, dir: &std::path::Path, store: &crate::store::Store) {
-        let paths: Vec<PathBuf> = walkdir::WalkDir::new(dir)
-            .into_iter()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.file_type().is_file())
-            .map(|e| e.into_path())
-            .filter(|p| is_supported_format(p))
-            .collect();
-        self.add_tracks(paths, store);
-    }
-
     pub fn remove_track(&mut self, index: usize) {
         self.tracks.remove(index);
         // Adjust current index after removal.
@@ -258,7 +234,7 @@ impl Playlist {
 }
 
 /// Returns true if the file extension is one rodio/symphonia can decode.
-fn is_supported_format(path: &std::path::Path) -> bool {
+pub(crate) fn is_supported_format(path: &std::path::Path) -> bool {
     match path
         .extension()
         .and_then(|e| e.to_str())

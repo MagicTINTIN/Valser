@@ -2,9 +2,11 @@ use bevy::prelude::*;
 use bevy_egui::egui::style::Selection;
 use bevy_egui::egui::{Color32, Stroke, Style, Theme};
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
+use std::path::PathBuf;
 use std::time::Duration;
 
 use crate::audio::{AudioCommand, PlaybackInfo, PlaybackState, TrackFinished};
+use crate::loader::{LoadRequest, LoaderChannel, LoadingState};
 use crate::playlist::{FilterScope, Playlist, Track};
 
 // ---------------------------------------------------------------------------
@@ -79,6 +81,8 @@ fn draw_ui(
     playback_info: Res<PlaybackInfo>,
     playback_state: Res<PlaybackState>,
     store: NonSend<crate::store::Store>,
+    loader: Option<Res<LoaderChannel>>,
+    mut loading: Option<ResMut<LoadingState>>,
 ) -> Result {
     let ctx = contexts.ctx_mut()?;
     setup_custom_style(&ctx);
@@ -147,12 +151,14 @@ fn draw_ui(
             ui.heading("🎵 Valser");
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui.button("🗀 Add Directory").clicked() {
-                    add_directory_action(&mut playlist, &*store, &ui_state);
-                    save_state_needed = true;
+                    if let (Some(loader), Some(loading)) = (&loader, &mut loading) {
+                        add_directory_action(loader, loading);
+                    }
                 }
                 if ui.button("➕ Add Files").clicked() {
-                    add_files_action(&mut playlist, &*store, &ui_state);
-                    save_state_needed = true;
+                    if let (Some(loader), Some(loading)) = (&loader, &mut loading) {
+                        add_files_action(loader, loading);
+                    }
                 }
             });
         });
@@ -178,11 +184,7 @@ fn draw_ui(
                         FilterScope::TrackName,
                         "Track name",
                     );
-                    ui.selectable_value(
-                        &mut ui_state.filter_scope,
-                        FilterScope::Artist,
-                        "Artist",
-                    );
+                    ui.selectable_value(&mut ui_state.filter_scope, FilterScope::Artist, "Artist");
                     ui.selectable_value(
                         &mut ui_state.filter_scope,
                         FilterScope::FileName,
@@ -192,6 +194,15 @@ fn draw_ui(
 
             ui.toggle_value(&mut ui_state.show_genre_panel, "🏷 Genres");
         });
+        if let Some(ref loading) = loading {
+            if loading.is_loading {
+                ui.horizontal(|ui| {
+                    ui.spinner();
+                    ui.label(loading.status_text());
+                    ui.add(egui::ProgressBar::new(loading.progress()).desired_width(200.0));
+                });
+            }
+        }
 
         ui.add(egui::Separator::default().shrink(20_f32));
 
@@ -208,7 +219,13 @@ fn draw_ui(
                 .map(|(i, t)| {
                     let is_current = playlist.current == Some(i);
                     let is_playing = is_current && *playback_state == PlaybackState::Playing;
-                    (i, t.display_name().to_string(), t.duration, is_current, is_playing)
+                    (
+                        i,
+                        t.display_name().to_string(),
+                        t.duration,
+                        is_current,
+                        is_playing,
+                    )
                 })
                 .collect();
 
@@ -219,25 +236,28 @@ fn draw_ui(
             .max_height(available_height)
             .show_rows(ui, row_height, visible_tracks.len(), |ui, row_range| {
                 for idx in row_range {
-                    let (i, display_name, duration, is_current, is_playing) =
-                        &visible_tracks[idx];
+                    let (i, display_name, duration, is_current, is_playing) = &visible_tracks[idx];
 
                     ui.horizontal(|ui| {
-                        let indicator =
-                            if *is_playing { "▶" } else if *is_current { "◼" } else { "  " };
+                        let indicator = if *is_playing {
+                            "▶"
+                        } else if *is_current {
+                            "◼"
+                        } else {
+                            "  "
+                        };
                         ui.label(egui::RichText::new(indicator).color(if *is_current {
                             egui::Color32::from_rgb(200, 75, 75)
                         } else {
                             egui::Color32::GRAY
                         }));
 
-                        let label =
-                            egui::RichText::new(format!("{}. {}", i + 1, display_name))
-                                .color(if *is_current {
-                                    egui::Color32::WHITE
-                                } else {
-                                    egui::Color32::LIGHT_GRAY
-                                });
+                        let label = egui::RichText::new(format!("{}. {}", i + 1, display_name))
+                            .color(if *is_current {
+                                egui::Color32::WHITE
+                            } else {
+                                egui::Color32::LIGHT_GRAY
+                            });
 
                         if ui
                             .add(egui::Label::new(label).sense(egui::Sense::click()))
@@ -246,26 +266,21 @@ fn draw_ui(
                             playlist_action = Some(PlaylistAction::Play(*i));
                         }
 
-                        ui.with_layout(
-                            egui::Layout::right_to_left(egui::Align::Center),
-                            |ui| {
-                                if ui
-                                    .add(egui::Button::new("✖").small())
-                                    .on_hover_text("Remove")
-                                    .clicked()
-                                {
-                                    playlist_action = Some(PlaylistAction::Remove(*i));
-                                }
-                                if let Some(dur) = duration {
-                                    ui.label(
-                                        egui::RichText::new(
-                                            Track::format_duration(*dur),
-                                        )
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if ui
+                                .add(egui::Button::new("✖").small())
+                                .on_hover_text("Remove")
+                                .clicked()
+                            {
+                                playlist_action = Some(PlaylistAction::Remove(*i));
+                            }
+                            if let Some(dur) = duration {
+                                ui.label(
+                                    egui::RichText::new(Track::format_duration(*dur))
                                         .color(egui::Color32::GRAY),
-                                    );
-                                }
-                            },
-                        );
+                                );
+                            }
+                        });
                     });
                 }
 
@@ -273,10 +288,8 @@ fn draw_ui(
                     ui.vertical_centered(|ui| {
                         ui.add_space(20.0);
                         ui.label(
-                            egui::RichText::new(
-                                "No tracks. Click ➕ Add Files to get started.",
-                            )
-                            .color(egui::Color32::GRAY),
+                            egui::RichText::new("No tracks. Click ➕ Add Files to get started.")
+                                .color(egui::Color32::GRAY),
                         );
                     });
                 }
@@ -285,12 +298,21 @@ fn draw_ui(
         ui.separator();
 
         // Seek bar
-        let total_secs = playback_info.duration.map(|d| d.as_secs_f32()).unwrap_or(0.0);
+        let total_secs = playback_info
+            .duration
+            .map(|d| d.as_secs_f32())
+            .unwrap_or(0.0);
         let pos_secs = playback_info.position.as_secs_f32();
-        let mut seek_val = if ui_state.seeking { ui_state.seek_preview } else { pos_secs };
+        let mut seek_val = if ui_state.seeking {
+            ui_state.seek_preview
+        } else {
+            pos_secs
+        };
 
         ui.horizontal(|ui| {
-            ui.label(Track::format_duration(Duration::from_secs_f32(pos_secs.max(0.0))));
+            ui.label(Track::format_duration(Duration::from_secs_f32(
+                pos_secs.max(0.0),
+            )));
             ui.label("/");
             ui.label(Track::format_duration(Duration::from_secs_f32(total_secs)));
             ui.style_mut().spacing.slider_width = ui.available_width();
@@ -325,13 +347,25 @@ fn draw_ui(
                 }
             }
 
-            let play_label = if *playback_state == PlaybackState::Playing { "⏸" } else { "▶" };
-            if ui.button(play_label).on_hover_text("Play / Pause").clicked() {
+            let play_label = if *playback_state == PlaybackState::Playing {
+                "⏸"
+            } else {
+                "▶"
+            };
+            if ui
+                .button(play_label)
+                .on_hover_text("Play / Pause")
+                .clicked()
+            {
                 match *playback_state {
                     PlaybackState::Stopped => {
-                        let idx = playlist
-                            .current
-                            .or_else(|| if playlist.tracks.is_empty() { None } else { Some(0) });
+                        let idx = playlist.current.or_else(|| {
+                            if playlist.tracks.is_empty() {
+                                None
+                            } else {
+                                Some(0)
+                            }
+                        });
                         if let Some(i) = idx {
                             let path = playlist.tracks[i].path.clone();
                             playlist.current = Some(i);
@@ -399,8 +433,11 @@ fn draw_ui(
     // Apply deferred actions
 
     if let Some((genre, shift)) = genre_action {
-        if shift { playlist.toggle_blacklist(&genre); }
-        else     { playlist.toggle_whitelist(&genre); }
+        if shift {
+            playlist.toggle_blacklist(&genre);
+        } else {
+            playlist.toggle_whitelist(&genre);
+        }
         save_state_needed = true;
     }
 
@@ -422,7 +459,9 @@ fn draw_ui(
                 let _ = store.remove_track(track.id);
             }
             playlist.remove_track(i);
-            if was_current { audio_cmd.stop = true; }
+            if was_current {
+                audio_cmd.stop = true;
+            }
             save_state_needed = true;
         }
         None => {}
@@ -447,6 +486,8 @@ fn handle_shortcuts(
     playback_info: Res<PlaybackInfo>,
     mut contexts: EguiContexts,
     store: NonSend<crate::store::Store>,
+    loader: Option<Res<LoaderChannel>>,
+    mut loading: Option<ResMut<LoadingState>>,
 ) {
     // Don't steal keystrokes while the user is typing in a text field.
     if let Ok(ctx) = contexts.ctx_mut() {
@@ -528,13 +569,19 @@ fn handle_shortcuts(
 
     // Ctrl+Shift+O -> open folder (recursive)
     if ctrl && shift && keys.just_pressed(KeyCode::KeyO) {
-        add_directory_action(&mut playlist, &*store, &ui_state);
+        // add_directory_action(&mut playlist, &*store, &ui_state);
+        if let (Some(loader), Some(loading)) = (&loader, &mut loading) {
+            add_directory_action(loader, loading);
+        }
         return; // avoid matching the plain Ctrl+O branch below
     }
 
     // Ctrl+O -> open files
     if ctrl && keys.just_pressed(KeyCode::KeyO) {
-        add_files_action(&mut playlist, &*store, &ui_state);
+        // add_files_action(&mut playlist, &*store, &ui_state);
+        if let (Some(loader), Some(loading)) = (&loader, &mut loading) {
+            add_files_action(loader, loading);
+        }
         return;
     }
 
@@ -555,9 +602,8 @@ enum PlaylistAction {
 }
 
 fn add_files_action(
-    playlist: &mut ResMut<Playlist>,
-    store: &crate::store::Store,
-    ui_state: &UiState,
+    loader: &LoaderChannel,
+    loading: &mut LoadingState,
 ) {
     if let Some(paths) = rfd::FileDialog::new()
         .set_title("Add audio files")
@@ -567,25 +613,28 @@ fn add_files_action(
         )
         .pick_files()
     {
-        playlist.add_tracks(paths, store);
-        let _ = store.save_state(&build_app_state(&playlist, &ui_state));
-        if playlist.current.is_none() && !playlist.tracks.is_empty() {
-            playlist.current = Some(0);
-        }
+        loading.queued += paths.len();
+        loading.loaded = 0;
+        loading.is_loading = true;
+        let _ = loader.request_tx.send(LoadRequest::Paths(paths));
     }
 }
 
-fn add_directory_action(
-    playlist: &mut ResMut<Playlist>,
-    store: &crate::store::Store,
-    ui_state: &UiState,
-) {
+fn add_directory_action(loader: &LoaderChannel, loading: &mut LoadingState) {
     if let Some(dir) = rfd::FileDialog::new().pick_folder() {
-        playlist.add_directory_recursive(&dir, store);
-        let _ = store.save_state(&build_app_state(&playlist, &ui_state));
-        if playlist.current.is_none() && !playlist.tracks.is_empty() {
-            playlist.current = Some(0);
-        }
+        // Collect paths synchronously
+        // then hand off everything else to the worker.
+        let paths: Vec<PathBuf> = walkdir::WalkDir::new(&dir)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_type().is_file())
+            .map(|e| e.into_path())
+            .filter(|p| crate::playlist::is_supported_format(p))
+            .collect();
+        loading.queued = paths.len();
+        loading.loaded = 0;
+        loading.is_loading = true;
+        let _ = loader.request_tx.send(LoadRequest::Paths(paths));
     }
 }
 
