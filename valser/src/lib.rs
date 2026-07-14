@@ -7,11 +7,16 @@ mod ui;
 
 use std::{path::PathBuf, time::Duration};
 
-use bevy::{prelude::*, winit::{UpdateMode, WinitSettings}};
+use bevy::{
+    prelude::*,
+    winit::{UpdateMode, WinitSettings},
+};
 use bevy_egui::EguiPlugin;
 
 use audio::AudioPlugin;
+#[cfg(target_os = "linux")]
 use dirs;
+#[cfg(target_os = "linux")]
 use mpris::MprisPlugin;
 use playlist::PlaylistPlugin;
 use ui::UiPlugin;
@@ -24,6 +29,37 @@ use crate::{
     audio::AudioCommand,
     playlist::{FilterScope, Playlist, Track},
 };
+
+fn get_app_dirs() -> (PathBuf, PathBuf) {
+    // #[cfg(target_os = "android")]
+    // {
+    //     // app's internal storage via environment variable
+    //     let base = std::env::var("ANDROID_DATA")
+    //         .or_else(|_| std::env::var("EXTERNAL_STORAGE"))
+    //         .map(PathBuf::from)
+    //         .unwrap_or_else(|_| PathBuf::from("/data/data/fr.magictintin.valser"));
+    //     let data = base.join("files").join("Valser");
+    //     let config = base.join("files").join("Valser");
+    //     (data, config)
+    // }
+    #[cfg(target_os = "android")]
+    {
+        let base = std::env::var("VALSER_DATA_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| PathBuf::from("/data/data/fr.magictintin.valser/files"));
+        (base.join("Valser"), base.join("Valser"))
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let data_dir = dirs::data_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("Valser");
+        let config_dir = dirs::config_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("Valser");
+        (data_dir, config_dir)
+    }
+}
 
 fn restore_state(
     store: NonSend<store::Store>,
@@ -98,17 +134,15 @@ fn save_state_on_exit(
 }
 
 pub fn run_app() {
-    let data_dir = dirs::data_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("Valser");
-    let config_dir = dirs::config_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("Valser");
+    let (data_dir, config_dir) = get_app_dirs();
 
     let store = match Store::open(&data_dir, &config_dir) {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("Failed to open store: {e}");
+            eprintln!("Failed to open store: {e}, starting with empty state");
+            // Store::default() // or however you create an empty store
+
+            // eprintln!("Failed to open store: {e}");
             std::process::exit(1);
         }
     };
@@ -116,30 +150,30 @@ pub fn run_app() {
     let mut app = App::new();
 
     app.insert_resource(WinitSettings {
-            // Render at max 30fps when focused, drop to 10fps when unfocused.
-            focused_mode: UpdateMode::reactive(Duration::from_millis(33)),
-            unfocused_mode: UpdateMode::reactive_low_power(Duration::from_millis(100)),
-        })
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                title: "Valser".to_string(),
-                resolution: (800u32, 500u32).into(),
-                ..default()
-            }),
+        // Render at max 30fps when focused, drop to 10fps when unfocused.
+        focused_mode: UpdateMode::reactive(Duration::from_millis(33)),
+        unfocused_mode: UpdateMode::reactive_low_power(Duration::from_millis(100)),
+    })
+    .add_plugins(DefaultPlugins.set(WindowPlugin {
+        primary_window: Some(Window {
+            title: "Valser".to_string(),
+            resolution: (800u32, 500u32).into(),
             ..default()
-        }))
-        .add_plugins(EguiPlugin::default())
-        .add_plugins(AudioPlugin)
-        .add_plugins(PlaylistPlugin)
-        .add_plugins(UiPlugin)
-        .add_plugins(LoaderPlugin)
-        .add_systems(Startup, (setup, restore_state).chain())
-        .add_systems(Last, save_state_on_exit)
-        .insert_non_send_resource(store);
-    
+        }),
+        ..default()
+    }))
+    .add_plugins(EguiPlugin::default())
+    .add_plugins(AudioPlugin)
+    .add_plugins(PlaylistPlugin)
+    .add_plugins(UiPlugin)
+    .add_plugins(LoaderPlugin)
+    .add_systems(Startup, (setup, restore_state).chain())
+    .add_systems(Last, save_state_on_exit)
+    .insert_non_send_resource(store);
+
     #[cfg(target_os = "linux")]
     app.add_plugins(MprisPlugin);
-    
+
     app.run();
 }
 

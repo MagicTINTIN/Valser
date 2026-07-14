@@ -5153,8 +5153,10 @@ dependencies = [
  "crossbeam-channel",
  "dirs",
  "futures",
+ "jni 0.21.1",
  "lofty",
  "mpris-server",
+ "ndk-context",
  "rand 0.10.2",
  "redb",
  "rfd",
@@ -5172,6 +5174,8 @@ name = "valser-android"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "jni 0.21.1",
+ "ndk-context",
  "valser",
 ]
 

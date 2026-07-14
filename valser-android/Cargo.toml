@@ -33,6 +33,10 @@ name = "android.permission.READ_MEDIA_AUDIO"
 config_changes = "orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
 launch_mode = "singleTask"
 
+[target.'cfg(target_os = "android")'.dependencies]
+ndk-context = "0.1"
+jni = "0.21"
+
 
 [package.metadata.android.signing.release]
 path = "/home/user/.android/valser-release.keystore"
