@@ -1,5 +1,6 @@
 mod audio;
 mod loader;
+#[cfg(target_os = "linux")]
 mod mpris;
 mod playlist;
 mod ui;
@@ -96,7 +97,7 @@ fn save_state_on_exit(
     }
 }
 
-fn main() {
+pub fn run_app() {
     let data_dir = dirs::data_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("Valser");
@@ -112,8 +113,9 @@ fn main() {
         }
     };
 
-    App::new()
-        .insert_resource(WinitSettings {
+    let mut app = App::new();
+
+    app.insert_resource(WinitSettings {
             // Render at max 30fps when focused, drop to 10fps when unfocused.
             focused_mode: UpdateMode::reactive(Duration::from_millis(33)),
             unfocused_mode: UpdateMode::reactive_low_power(Duration::from_millis(100)),
@@ -128,14 +130,17 @@ fn main() {
         }))
         .add_plugins(EguiPlugin::default())
         .add_plugins(AudioPlugin)
-        .add_plugins(MprisPlugin)
         .add_plugins(PlaylistPlugin)
         .add_plugins(UiPlugin)
         .add_plugins(LoaderPlugin)
         .add_systems(Startup, (setup, restore_state).chain())
         .add_systems(Last, save_state_on_exit)
-        .insert_non_send_resource(store)
-        .run();
+        .insert_non_send_resource(store);
+    
+    #[cfg(target_os = "linux")]
+    app.add_plugins(MprisPlugin);
+    
+    app.run();
 }
 
 fn setup(mut commands: Commands) {

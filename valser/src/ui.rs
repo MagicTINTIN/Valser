@@ -13,7 +13,7 @@ use crate::playlist::{FilterScope, GenreCountCache, Playlist, Track};
 // UI state
 // ---------------------------------------------------------------------------
 
-#[derive(Resource, Default)]
+#[derive(Resource)]
 pub struct UiState {
     pub volume: f32,
     pub seeking: bool,
@@ -21,6 +21,36 @@ pub struct UiState {
     pub filter: String,
     pub filter_scope: FilterScope,
     pub show_genre_panel: bool, // toggle sidebar visibility
+
+    #[cfg(target_os = "android")]
+    pub file_browser: FileBrowserState,
+}
+
+#[cfg(target_os = "android")]
+pub struct FileBrowserState {
+    pub open: bool,
+    pub current_dir: PathBuf,
+    pub entries: Vec<(PathBuf, bool)>, // (path, is_dir)
+}
+
+impl Default for UiState {
+    fn default() -> Self {
+        Self {
+            volume: 1.0,
+            seeking: false,
+            seek_preview: 0.0,
+            filter: String::new(),
+            filter_scope: FilterScope::default(),
+            show_genre_panel: false,
+            // show_settings_panel: false,
+            #[cfg(target_os = "android")]
+            file_browser: FileBrowserState {
+                open: false,
+                current_dir: std::path::PathBuf::from("/sdcard/Music"),
+                entries: Vec::new(),
+            },
+        }
+    }
 }
 
 // Systems
@@ -72,6 +102,21 @@ fn use_dark_red_accent(style: &mut Style) {
     };
 }
 
+#[cfg(target_os = "android")]
+fn refresh_browser(state: &mut FileBrowserState) {
+    state.entries = std::fs::read_dir(&state.current_dir)
+        .into_iter()
+        .flatten()
+        .filter_map(|e| e.ok())
+        .map(|e| {
+            let is_dir = e.file_type().map(|t| t.is_dir()).unwrap_or(false);
+            (e.path(), is_dir)
+        })
+        .collect();
+    // Dirs first, then files, both alphabetical
+    state.entries.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+}
+
 /// The main egui draw system.
 fn draw_ui(
     mut contexts: EguiContexts,
@@ -92,6 +137,77 @@ fn draw_ui(
     let mut clear_genre_filters = false;
     let mut playlist_action: Option<PlaylistAction> = None;
     let mut save_state_needed = false;
+
+    #[cfg(target_os = "android")]
+    if ui_state.file_browser.open {
+        egui::Window::new("📂 Browse files")
+            .resizable(true)
+            .default_size([400.0, 500.0])
+            .show(ctx, |ui| {
+                let current = ui_state.file_browser.current_dir.clone();
+
+                ui.horizontal(|ui| {
+                    if ui.button("⬆ Up").clicked() {
+                        if let Some(parent) = current.parent() {
+                            ui_state.file_browser.current_dir = parent.to_path_buf();
+                            refresh_browser(&mut ui_state.file_browser);
+                        }
+                    }
+                    ui.label(current.display().to_string());
+                });
+                ui.separator();
+
+                let mut action: Option<BrowserAction> = None;
+
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    for (path, is_dir) in ui_state.file_browser.entries.clone() {
+                        let name = path.file_name()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("?")
+                            .to_string();
+
+                        ui.horizontal(|ui| {
+                            if is_dir {
+                                if ui.button(format!("📁 {}", name)).clicked() {
+                                    action = Some(BrowserAction::Enter(path.clone()));
+                                }
+                                if ui.small_button("➕ Add all").clicked() {
+                                    action = Some(BrowserAction::AddDir(path.clone()));
+                                }
+                            } else if crate::playlist::is_supported_format(&path) {
+                                if ui.button(format!("🎵 {}", name)).clicked() {
+                                    action = Some(BrowserAction::AddFile(path.clone()));
+                                }
+                            }
+                        });
+                    }
+                });
+
+                // Apply browser action after the scroll area releases borrows
+                match action {
+                    Some(BrowserAction::Enter(dir)) => {
+                        ui_state.file_browser.current_dir = dir;
+                        refresh_browser(&mut ui_state.file_browser);
+                    }
+                    Some(BrowserAction::AddDir(dir)) => {
+                        if let (Some(l), Some(ref mut ld)) = (&loader, &mut loading) {
+                            add_directory_action_path(&dir, l, ld);
+                        }
+                        ui_state.file_browser.open = false;
+                        save_state_needed = true;
+                    }
+                    Some(BrowserAction::AddFile(file)) => {
+                        if let (Some(l), Some(ref mut ld)) = (&loader, &mut loading) {
+                            ld.queued += 1;
+                            ld.is_loading = true;
+                            let _ = l.request_tx.send(crate::loader::LoadRequest::Paths(vec![file]));
+                        }
+                        save_state_needed = true;
+                    }
+                    None => {}
+                }
+            });
+    }
 
     // -----------------------------------------------------------------------
     // Genre side panel
@@ -151,22 +267,38 @@ fn draw_ui(
         ui.horizontal(|ui| {
             ui.heading("🎵 Valser");
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.button("🗀 Add Directory")
-                    .on_hover_text("Add directory to playlist (Ctrl+Shift+O)").clicked() {
-                    if let (Some(loader), Some(loading)) = (&loader, &mut loading) {
-                        add_directory_action(loader, loading);
-                    }
-                }
-                if ui.button("➕ Add Files")
-                    .on_hover_text("Add tracks to playlist (Ctrl+O)").clicked() {
-                    if let (Some(loader), Some(loading)) = (&loader, &mut loading) {
-                        add_files_action(loader, loading);
-                    }
-                }
-                if ui
-                    .button("🗑 Clear")
-                    .clicked()
+                #[cfg(not(target_os = "android"))]
                 {
+                    if ui
+                        .button("🗀 Add Directory")
+                        .on_hover_text("Add directory to playlist (Ctrl+Shift+O)")
+                        .clicked()
+                    {
+                        if let (Some(loader), Some(loading)) = (&loader, &mut loading) {
+                            add_directory_action(loader, loading);
+                        }
+                    }
+                    if ui
+                        .button("➕ Add Files")
+                        .on_hover_text("Add tracks to playlist (Ctrl+O)")
+                        .clicked()
+                    {
+                        if let (Some(loader), Some(loading)) = (&loader, &mut loading) {
+                            add_files_action(loader, loading);
+                        }
+                    }
+                }
+                #[cfg(target_os = "android")]
+                {
+                    if ui.button("📂 Browse").clicked() {
+                        // Initialize entries for the current dir when opening
+                        if !ui_state.file_browser.open {
+                            refresh_browser(&mut ui_state.file_browser);
+                        }
+                        ui_state.file_browser.open = !ui_state.file_browser.open;
+                    }
+                }
+                if ui.button("🗑 Clear").clicked() {
                     let _ = store.clear_all_tracks();
                     playlist.tracks.clear();
                     playlist.current = None;
@@ -614,18 +746,31 @@ enum PlaylistAction {
     Remove(usize),
 }
 
-fn add_files_action(
-    loader: &LoaderChannel,
-    loading: &mut LoadingState,
-) {
-    if let Some(paths) = rfd::FileDialog::new()
+#[cfg(target_os = "android")]
+enum BrowserAction {
+    Enter(std::path::PathBuf),
+    AddDir(std::path::PathBuf),
+    AddFile(std::path::PathBuf),
+}
+
+#[cfg(not(target_os = "android"))]
+fn pick_audio_files() -> Option<Vec<PathBuf>> {
+    rfd::FileDialog::new()
         .set_title("Add audio files")
         .add_filter(
-            "Audio files",
+            "Audio",
             &["mp3", "ogg", "opus", "flac", "wav", "m4a", "aac", "aiff"],
         )
         .pick_files()
-    {
+}
+
+#[cfg(not(target_os = "android"))]
+fn pick_folder() -> Option<PathBuf> {
+    rfd::FileDialog::new().pick_folder()
+}
+
+fn add_files_action(loader: &LoaderChannel, loading: &mut LoadingState) {
+    if let Some(paths) = pick_audio_files() {
         loading.queued += paths.len();
         loading.loaded = 0;
         loading.is_loading = true;
@@ -634,7 +779,7 @@ fn add_files_action(
 }
 
 fn add_directory_action(loader: &LoaderChannel, loading: &mut LoadingState) {
-    if let Some(dir) = rfd::FileDialog::new().pick_folder() {
+    if let Some(dir) = pick_folder() {
         // Collect paths synchronously
         // then hand off everything else to the worker.
         let paths: Vec<PathBuf> = walkdir::WalkDir::new(&dir)
