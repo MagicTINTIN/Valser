@@ -408,17 +408,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "audiopus_sys"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62314a1546a2064e033665d658e88c620a62904be945f8147e6b16c3db9f8651"
-dependencies = [
- "cmake",
- "log",
- "pkg-config",
-]
-
-[[package]]
 name = "autocfg"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3598,15 +3587,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ogg"
-version = "0.9.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fdab8dcd8d4052eaacaf8fb07a3ccd9a6e26efadb42878a413c68fc4af1dee2b"
-dependencies = [
- "byteorder",
-]
-
-[[package]]
 name = "ogg_pager"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3628,12 +3608,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
-name = "opus"
-version = "0.3.1"
+name = "opusic-sys"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d3809943dff6fbad5f0484449ea26bdb9cb7d8efdf26ed50d3c7f227f69eb5c"
+checksum = "2804e694ef0de3b4cbb254de565053b7cb48d3398df7fd60c6c62bed40c5372a"
 dependencies = [
- "audiopus_sys",
+ "cmake",
 ]
 
 [[package]]
@@ -4547,6 +4527,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "symphonia-adapter-libopus"
+version = "0.2.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2bfc8e95f95c23ed1b5328eb66920ad28d9968c797f9c7aa755d4b45a5f47a41"
+dependencies = [
+ "log",
+ "opusic-sys",
+ "symphonia-core",
+]
+
+[[package]]
 name = "symphonia-bundle-flac"
 version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5156,6 +5147,7 @@ dependencies = [
 name = "valser"
 version = "0.2.2"
 dependencies = [
+ "android-activity",
  "bevy",
  "bevy_egui",
  "crossbeam-channel",
@@ -5163,8 +5155,6 @@ dependencies = [
  "futures",
  "lofty",
  "mpris-server",
- "ogg",
- "opus",
  "rand 0.10.2",
  "redb",
  "rfd",
@@ -5172,6 +5162,8 @@ dependencies = [
  "serde",
  "serde_json",
  "smol",
+ "symphonia",
+ "symphonia-adapter-libopus",
  "walkdir",
 ]
 
