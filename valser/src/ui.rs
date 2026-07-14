@@ -114,7 +114,9 @@ fn refresh_browser(state: &mut FileBrowserState) {
         })
         .collect();
     // Dirs first, then files, both alphabetical
-    state.entries.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+    state
+        .entries
+        .sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
 }
 
 /// The main egui draw system.
@@ -161,7 +163,8 @@ fn draw_ui(
 
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     for (path, is_dir) in ui_state.file_browser.entries.clone() {
-                        let name = path.file_name()
+                        let name = path
+                            .file_name()
                             .and_then(|n| n.to_str())
                             .unwrap_or("?")
                             .to_string();
@@ -200,7 +203,9 @@ fn draw_ui(
                         if let (Some(l), Some(ref mut ld)) = (&loader, &mut loading) {
                             ld.queued += 1;
                             ld.is_loading = true;
-                            let _ = l.request_tx.send(crate::loader::LoadRequest::Paths(vec![file]));
+                            let _ = l
+                                .request_tx
+                                .send(crate::loader::LoadRequest::Paths(vec![file]));
                         }
                         save_state_needed = true;
                     }
@@ -712,22 +717,25 @@ fn handle_shortcuts(
         return;
     }
 
-    // Ctrl+Shift+O -> open folder (recursive)
-    if ctrl && shift && keys.just_pressed(KeyCode::KeyO) {
-        // add_directory_action(&mut playlist, &*store, &ui_state);
-        if let (Some(loader), Some(loading)) = (&loader, &mut loading) {
-            add_directory_action(loader, loading);
+    #[cfg(not(target_os = "android"))]
+    {
+        // Ctrl+Shift+O -> open folder (recursive)
+        if ctrl && shift && keys.just_pressed(KeyCode::KeyO) {
+            // add_directory_action(&mut playlist, &*store, &ui_state);
+            if let (Some(loader), Some(loading)) = (&loader, &mut loading) {
+                add_directory_action(loader, loading);
+            }
+            return; // avoid matching the plain Ctrl+O branch below
         }
-        return; // avoid matching the plain Ctrl+O branch below
-    }
 
-    // Ctrl+O -> open files
-    if ctrl && keys.just_pressed(KeyCode::KeyO) {
-        // add_files_action(&mut playlist, &*store, &ui_state);
-        if let (Some(loader), Some(loading)) = (&loader, &mut loading) {
-            add_files_action(loader, loading);
+        // Ctrl+O -> open files
+        if ctrl && keys.just_pressed(KeyCode::KeyO) {
+            // add_files_action(&mut playlist, &*store, &ui_state);
+            if let (Some(loader), Some(loading)) = (&loader, &mut loading) {
+                add_files_action(loader, loading);
+            }
+            return;
         }
-        return;
     }
 
     // Ctrl+S -> shuffle
@@ -769,6 +777,7 @@ fn pick_folder() -> Option<PathBuf> {
     rfd::FileDialog::new().pick_folder()
 }
 
+#[cfg(not(target_os = "android"))]
 fn add_files_action(loader: &LoaderChannel, loading: &mut LoadingState) {
     if let Some(paths) = pick_audio_files() {
         loading.queued += paths.len();
@@ -778,22 +787,28 @@ fn add_files_action(loader: &LoaderChannel, loading: &mut LoadingState) {
     }
 }
 
+#[cfg(not(target_os = "android"))]
 fn add_directory_action(loader: &LoaderChannel, loading: &mut LoadingState) {
     if let Some(dir) = pick_folder() {
-        // Collect paths synchronously
-        // then hand off everything else to the worker.
-        let paths: Vec<PathBuf> = walkdir::WalkDir::new(&dir)
-            .into_iter()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.file_type().is_file())
-            .map(|e| e.into_path())
-            .filter(|p| crate::playlist::is_supported_format(p))
-            .collect();
-        loading.queued = paths.len();
-        loading.loaded = 0;
-        loading.is_loading = true;
-        let _ = loader.request_tx.send(LoadRequest::Paths(paths));
+        add_directory_action_path(&dir, loader, loading);
     }
+}
+
+fn add_directory_action_path(dir: &PathBuf, loader: &LoaderChannel, loading: &mut LoadingState) {
+    // Collect paths synchronously
+    // then hand off everything else to the worker.
+    let paths: Vec<PathBuf> = walkdir::WalkDir::new(&dir)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_file())
+        .map(|e| e.into_path())
+        .filter(|p| crate::playlist::is_supported_format(p))
+        .collect();
+    loading.queued = paths.len();
+    loading.loaded = 0;
+    loading.is_loading = true;
+
+    let _ = loader.request_tx.send(LoadRequest::Paths(paths));
 }
 
 fn build_app_state(playlist: &Playlist, ui_state: &UiState) -> crate::store::AppState {
