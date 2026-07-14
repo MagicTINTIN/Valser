@@ -151,7 +151,9 @@ fn update_audio(
     mut playback_info: ResMut<PlaybackInfo>,
     mut track_finished: MessageWriter<TrackFinished>,
     audio: Option<NonSendMut<AudioState>>,
+    #[cfg(target_os = "linux")]
     mpris_tx: Option<Res<crate::mpris::MprisStateSender>>,
+    #[cfg(target_os = "linux")]
     playlist: Res<crate::playlist::Playlist>,
 ) {
     let Some(mut audio) = audio else { return };
@@ -163,6 +165,7 @@ fn update_audio(
         *playback_state = PlaybackState::Playing;
 
         // push Playing status to mpris with metadata for the newly loaded track
+        #[cfg(target_os = "linux")]
         if let Some(tx) = &mpris_tx {
             let _ = tx.0.send(crate::mpris::MprisStateUpdate::Playing);
 
@@ -188,6 +191,7 @@ fn update_audio(
         };
 
         // send the state to mpris too
+        #[cfg(target_os = "linux")]
         if let Some(tx) = &mpris_tx {
             let update = if *playback_state == PlaybackState::Paused {
                 crate::mpris::MprisStateUpdate::Paused
@@ -205,6 +209,7 @@ fn update_audio(
         playback_info.position = Duration::ZERO;
         *playback_state = PlaybackState::Stopped;
 
+        #[cfg(target_os = "linux")]
         if let Some(tx) = &mpris_tx {
             let _ = tx.0.send(crate::mpris::MprisStateUpdate::Stopped);
         }
@@ -221,6 +226,7 @@ fn update_audio(
     if *playback_state == PlaybackState::Playing {
         playback_info.position = audio.position();
 
+        #[cfg(target_os = "linux")]
         if let Some(tx) = &mpris_tx {
             let _ = tx.0.send(crate::mpris::MprisStateUpdate::Position(
                 playback_info.position.as_secs_f64(),
@@ -233,6 +239,7 @@ fn update_audio(
             track_finished.write(TrackFinished);
 
             // track ended naturally -> report Stopped too.
+            #[cfg(target_os = "linux")]
             if let Some(tx) = &mpris_tx {
                 let _ = tx.0.send(crate::mpris::MprisStateUpdate::Stopped);
             }

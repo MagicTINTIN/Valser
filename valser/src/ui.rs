@@ -737,6 +737,17 @@ fn handle_shortcuts(
             return;
         }
     }
+    #[cfg(target_os = "android")]
+    {
+        let default_android_music_dir = PathBuf::from("/sdcard/Music");
+        if ctrl && shift && keys.just_pressed(KeyCode::KeyO) {
+            // add_directory_action(&mut playlist, &*store, &ui_state);
+            if let (Some(loader), Some(loading)) = (&loader, &mut loading) {
+                add_directory_action_path(&default_android_music_dir, loader, loading);
+            }
+            return; // avoid matching the plain Ctrl+O branch below
+        }
+    }
 
     // Ctrl+S -> shuffle
     if ctrl && keys.just_pressed(KeyCode::KeyS) {

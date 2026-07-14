@@ -29,10 +29,9 @@ bevy = { version = "0.18.1", default-features = false, features = [
     "wayland",
 ] }
 
-bevy_egui = "0.39.1"
+android-activity = { version = "0.6", features = ["native-activity"], optional = true }
 
-ogg = "0.9"
-opus = "0.3"
+bevy_egui = "0.39.1"
 
 rand = "0.10.1"
 walkdir = "2.5.0"
@@ -42,6 +41,30 @@ serde = { version = "1.0.228", features = ["derive"]}
 serde_json = "1.0.150"
 dirs = "6.0.0"
 crossbeam-channel = "0.5.16"
+
+
+rodio = { version = "*", default-features = false, features = [
+    "playback",
+    "symphonia-all",
+    "symphonia-ogg",
+    "symphonia-mkv",
+] }
+
+symphonia = { version = "0.5", default-features = false, features = ["ogg"] }
+symphonia-adapter-libopus = "0.2"
+
+# the following doesn't work as cpal-shared-stdcxx doesn't exist in 0.22 (only 0.21 which isn't compatible with my soft)
+
+# [target.'cfg(target_os = "android")'.dependencies.rodio]
+# version = "*"
+# default-features = false
+# features = ["playback", "symphonia-all", "cpal-shared-stdcxx"]
+
+# [target.'cfg(not(target_os = "android"))'.dependencies.rodio]
+# version = "*"
+# default-features = false
+# features = ["playback", "symphonia-all"]
+
 
 
 [target.'cfg(not(target_os = "android"))'.dependencies]
@@ -54,20 +77,3 @@ futures = "0.3.32"
 # [target.'cfg(target_os = "android")'.dependencies]
 # cpal-shared-stdcxx fixes C++ stdlib linking on Android
 # rodio already pulls in cpal, this just adds the feature
-
-rodio = { version = "*", default-features = false, features = [
-    "playback",
-    "symphonia-all",
-    "symphonia-ogg",
-    "symphonia-mkv",
-] }
-
-# [target.'cfg(target_os = "android")'.dependencies.rodio]
-# version = "0.22.*"
-# default-features = false
-# features = ["playback", "symphonia-all", "cpal-shared-stdcxx"]
-
-# [target.'cfg(not(target_os = "android"))'.dependencies.rodio]
-# version = "0.22.*"
-# default-features = false
-# features = ["playback", "symphonia-all"]
