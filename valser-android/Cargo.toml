@@ -34,12 +34,13 @@ config_changes = "orientation|keyboardHidden|keyboard|screenSize|smallestScreenS
 launch_mode = "singleTask"
 
 [target.'cfg(target_os = "android")'.dependencies]
+android-activity = { version = "0.6", features = ["native-activity"] }
 ndk-context = "0.1"
 jni = "0.21"
 
 
 [package.metadata.android.signing.release]
 path = "/home/user/.android/valser-release.keystore"
-keystore_password = "the_password_here"
+keystore_password = "àlleZc0mmonthef1rstaPk@mg!"
 alias = "valser"
-key_password = "the_password_here"
+key_password = "àlleZc0mmonthef1rstaPk@mg!"

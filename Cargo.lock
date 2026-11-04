@@ -5173,6 +5173,7 @@ dependencies = [
 name = "valser-android"
 version = "0.1.0"
 dependencies = [
+ "android-activity",
  "bevy",
  "jni 0.21.1",
  "ndk-context",

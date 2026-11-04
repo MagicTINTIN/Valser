@@ -109,7 +109,9 @@ fn refresh_browser(state: &mut FileBrowserState) {
         .flatten()
         .filter_map(|e| e.ok())
         .map(|e| {
-            let is_dir = e.file_type().map(|t| t.is_dir()).unwrap_or(false);
+            let is_dir = std::fs::metadata(e.path())
+                .map(|m| m.is_dir())
+                .unwrap_or(false);
             (e.path(), is_dir)
         })
         .collect();

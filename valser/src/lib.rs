@@ -1,3 +1,5 @@
+#[cfg(target_os = "android")]
+mod android_permissions;
 mod audio;
 mod loader;
 #[cfg(target_os = "linux")]
@@ -151,9 +153,10 @@ pub fn run_app() {
 
     app.insert_resource(WinitSettings {
         // Render at max 30fps when focused, drop to 10fps when unfocused.
-        focused_mode: UpdateMode::reactive(Duration::from_millis(33)),
+        focused_mode: UpdateMode::reactive(Duration::from_millis(16)),
         unfocused_mode: UpdateMode::reactive_low_power(Duration::from_millis(100)),
     })
+    .insert_resource(bevy::prelude::ClearColor(bevy::prelude::Color::srgb(0.1, 0.1, 0.1)))
     .add_plugins(DefaultPlugins.set(WindowPlugin {
         primary_window: Some(Window {
             title: "Valser".to_string(),
@@ -169,12 +172,25 @@ pub fn run_app() {
     .add_plugins(LoaderPlugin)
     .add_systems(Startup, (setup, restore_state).chain())
     .add_systems(Last, save_state_on_exit)
+    .add_systems(Startup, request_permissions_startup)
     .insert_non_send_resource(store);
 
     #[cfg(target_os = "linux")]
     app.add_plugins(MprisPlugin);
 
     app.run();
+}
+
+#[cfg(target_os = "android")]
+fn request_permissions_startup() {
+    error!("COMMON PUTAING!?! (enfait si)");
+    android_permissions::request_audio_permission();
+}
+
+// No-op on desktop so the system always exists
+#[cfg(not(target_os = "android"))]
+fn request_permissions_startup() {
+    error!("LA CON DE TA RACE!?!");
 }
 
 fn setup(mut commands: Commands) {
