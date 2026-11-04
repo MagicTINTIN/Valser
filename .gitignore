@@ -1,4 +1,8 @@
 target/
+dist/
+src-tauri/gen/schemas/
+*.jks
+*.keystore
 *.log
 old_*
 tmp_*

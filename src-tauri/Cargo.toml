@@ -1,0 +1,35 @@
+[package]
+name = "valser"
+description = "Music player with niche and or useless features"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/MagicTINTIN/Valser"
+documentation = "https://github.com/MagicTINTIN/Valser/wiki"
+version = "0.2.2"
+edition = "2024"
+
+[package.metadata.release]
+pre-release-hook = ["git", "cliff", "-o", "CHANGELOG.md", "--tag", "{{tag_name}}"]
+pre-release-commit-message = "chore(release): {{version}}"
+tag-message = "Release {{version}}"
+tag-name = "v{{version}}"
+sign-tag = false
+
+[lib]
+name = "valser_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+valser-core = { path = "../core" }
+tauri = { version = "2", features = [] }
+serde = { version = "1.0.228", features = ["derive"] }
+crossbeam-channel = "0.5.16"
+
+[target.'cfg(not(target_os = "android"))'.dependencies]
+rfd = "0.17.1"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+mpris-server = "0.10.0"
+smol = "2.0.2"
