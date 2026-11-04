@@ -35,6 +35,7 @@ async fn pick(folder: bool, tx: State<'_, Sender<Cmd>>) -> Result<(), ()> {
 #[cfg(target_os = "android")]
 mod browse {
     use serde::Serialize;
+    use std::collections::BTreeSet;
     use std::path::{Path, PathBuf};
     use valser_core::playlist::is_supported_format;
 
@@ -50,14 +51,17 @@ mod browse {
     }
 
     /// Internal storage and every mounted volume such as SD cards.
+    /// Apps cannot list /storage, so volumes are read from the mount table.
     fn roots() -> Vec<Entry> {
+        let mounts = std::fs::read_to_string("/proc/self/mountinfo").unwrap_or_default();
+        let volumes: BTreeSet<&str> = mounts
+            .lines()
+            .filter_map(|line| line.split(' ').nth(4)?.strip_prefix("/storage/"))
+            .filter(|name| !name.contains('/') && *name != "emulated" && *name != "self")
+            .collect();
+
         let mut roots = vec![entry("/storage/emulated/0".into(), "Internal storage".into())];
-        let volumes = std::fs::read_dir("/storage").into_iter().flatten().flatten();
-        roots.extend(
-            volumes
-                .filter(|e| e.file_name() != "emulated" && e.file_name() != "self")
-                .map(|e| entry(e.path(), e.file_name().to_string_lossy().into_owned())),
-        );
+        roots.extend(volumes.into_iter().map(|name| entry(format!("/storage/{name}").into(), name.into())));
         roots
     }
 
