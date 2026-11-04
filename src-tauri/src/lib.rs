@@ -1,3 +1,5 @@
+#[cfg(target_os = "android")]
+mod android;
 mod engine;
 #[cfg(target_os = "linux")]
 mod mpris;

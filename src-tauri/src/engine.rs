@@ -38,6 +38,15 @@ pub enum Cmd {
     Loaded(Vec<TrackRecord>),
 }
 
+/// Playback info shared with the system media controls.
+pub struct MediaState {
+    pub state: PlaybackState,
+    pub title: String,
+    pub artist: String,
+    pub length: f64,
+    pub position: f64,
+}
+
 #[derive(Serialize)]
 struct Row<'a> {
     index: usize,
@@ -91,13 +100,15 @@ struct Engine {
     resume: Option<(u64, f64)>,
     last_save: Instant,
     #[cfg(target_os = "linux")]
-    mpris: smol::channel::Sender<crate::mpris::MprisState>,
+    mpris: smol::channel::Sender<MediaState>,
 }
 
 pub fn spawn(app: AppHandle, store: Store) -> Sender<Cmd> {
     let (tx, rx) = crossbeam_channel::unbounded();
     #[cfg(target_os = "linux")]
     let mpris = crate::mpris::spawn(tx.clone());
+    #[cfg(target_os = "android")]
+    crate::android::listen(tx.clone());
     let engine_tx = tx.clone();
 
     std::thread::spawn(move || {
@@ -409,13 +420,17 @@ impl Engine {
         };
         let _ = self.app.emit("status", &status);
 
-        #[cfg(target_os = "linux")]
-        let _ = self.mpris.try_send(crate::mpris::MprisState {
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        let media = MediaState {
             state: self.state,
             title: status.title.unwrap_or_default().to_string(),
             artist: track.and_then(|t| t.artist.clone()).unwrap_or_default(),
             length: status.duration.unwrap_or(0.0),
             position,
-        });
+        };
+        #[cfg(target_os = "android")]
+        crate::android::update(&media);
+        #[cfg(target_os = "linux")]
+        let _ = self.mpris.try_send(media);
     }
 }

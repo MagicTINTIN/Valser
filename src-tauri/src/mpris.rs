@@ -3,18 +3,10 @@ use mpris_server::{Metadata, PlaybackStatus, Player, Time};
 use smol::channel::Receiver;
 use valser_core::audio::PlaybackState;
 
-use crate::engine::Cmd;
-
-pub struct MprisState {
-    pub state: PlaybackState,
-    pub title: String,
-    pub artist: String,
-    pub length: f64,
-    pub position: f64,
-}
+use crate::engine::{Cmd, MediaState};
 
 /// Runs the D-Bus server on its own thread.
-pub fn spawn(tx: Sender<Cmd>) -> smol::channel::Sender<MprisState> {
+pub fn spawn(tx: Sender<Cmd>) -> smol::channel::Sender<MediaState> {
     let (state_tx, state_rx) = smol::channel::unbounded();
     std::thread::spawn(move || smol::block_on(run(tx, state_rx)));
     state_tx
@@ -35,7 +27,7 @@ fn status(state: PlaybackState) -> PlaybackStatus {
     }
 }
 
-async fn run(tx: Sender<Cmd>, state_rx: Receiver<MprisState>) {
+async fn run(tx: Sender<Cmd>, state_rx: Receiver<MediaState>) {
     let player = match Player::builder("fr.magictintin.valser")
         .can_play(true)
         .can_pause(true)
@@ -63,7 +55,7 @@ async fn run(tx: Sender<Cmd>, state_rx: Receiver<MprisState>) {
     });
 
     let updates = async {
-        let mut last: Option<MprisState> = None;
+        let mut last: Option<MediaState> = None;
         while let Ok(s) = state_rx.recv().await {
             if last.as_ref().is_none_or(|l| l.state != s.state) {
                 let _ = player.set_playback_status(status(s.state)).await;
