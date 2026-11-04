@@ -380,9 +380,9 @@ impl Engine {
             .into_iter()
             .map(|(name, count)| Genre {
                 mode: if playlist.genre_whitelist.contains(&name) {
-                    "white"
+                    "whitelist"
                 } else if playlist.genre_blacklist.contains(&name) {
-                    "black"
+                    "blacklist"
                 } else {
                     ""
                 },

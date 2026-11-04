@@ -57,13 +57,16 @@ impl Track {
     }
 
     pub fn display_name(&self) -> &str {
-        self.title.as_deref().unwrap_or(&self.name)
+        &self.name
     }
 
     pub fn matches_filter(&self, query: &str, scope: FilterScope) -> bool {
         let q = query.to_lowercase();
         match scope {
-            FilterScope::TrackName => self.display_name().to_lowercase().contains(&q),
+            FilterScope::TrackName => self
+                .title
+                .as_deref()
+                .is_some_and(|t| t.to_lowercase().contains(&q)),
             FilterScope::Artist => self
                 .artist
                 .as_deref()

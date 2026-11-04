@@ -3,6 +3,7 @@
   --panel: #16161f;
   --text: #dddddd;
   --muted: #8a8a8a;
+  --hard-muted: #4a4a4a;
   --accent: #FD9E27;
   --accent-bg: #804f13;
   --alt: #27D0FD;
@@ -10,6 +11,11 @@
   --whitelist: #27FD31;
   --blacklist: #FD3227;
   color-scheme: dark;
+  --accent-filter: invert(71%) sepia(20%) saturate(2633%) hue-rotate(340deg) brightness(102%) contrast(98%);
+}
+
+.accent-svg {
+  filter: var(--accent-filter);
 }
 
 * { box-sizing: border-box; }
@@ -71,8 +77,8 @@ ul { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
 #genres { width: 200px; display: flex; flex-direction: column; gap: 6px; }
 #genre-list { flex: 1; }
 #genre-list li { padding: 2px 4px; cursor: pointer; user-select: none; -webkit-user-select: none; }
-#genre-list li.white { color: var(--whitelist); }
-#genre-list li.black { color: var(--blacklist); }
+#genre-list li.whitelist { color: var(--whitelist); }
+#genre-list li.blacklist { color: var(--blacklist); }
 .hint { margin: 0; font-size: 12px; color: var(--muted); }
 
 #tracks { flex: 1; }
@@ -89,6 +95,13 @@ ul { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
   content-visibility: auto;
   contain-intrinsic-size: auto 26px;
 }
+.track_num {
+  color: var(--hard-muted);
+  min-width: 3em;
+  display: inline-block;
+  margin-right: 5px;
+}
+
 #tracks li:hover { background: var(--panel); }
 #tracks li.current { color: var(--text); border-left: 3px solid var(--accent); }
 #tracks li.playing { color: var(--accent); }
@@ -102,12 +115,16 @@ ul { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
 #volume { width: 100px; }
 #now {
   flex: 1;
-  text-align: right;
+  text-align: center;
   color: var(--accent);
-  font-size: 12px;
+  /* font-size: 12px; */
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  /* white-space: nowrap; */
+  background-color: var(--panel);
+  margin: 0 auto;
+  padding: 8px;
+  border-radius: 4px;
 }
 
 #browser {
@@ -125,3 +142,9 @@ ul { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
 #entries li { display: flex; gap: 6px; padding: 2px 0; }
 #entries .open { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; }
 #entries .file { background: none; }
+
+button img {
+  filter: var(--accent-filter);
+  width: 2em;
+  height: 2em;
+}

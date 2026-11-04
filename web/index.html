@@ -1,73 +1,76 @@
 <!doctype html>
 <html>
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>Valser</title>
-    <link rel="stylesheet" href="style.css">
-  </head>
-  <body>
-    <header>
-      <img src="assets/icon.png">
-      <h1>Valser</h1>
-      <div class="actions">
-        <button id="add-dir" class="desktop" title="Ctrl+Shift+O">Add directory</button>
-        <button id="add-files" class="desktop" title="Ctrl+O">Add files</button>
-        <button id="browse" class="mobile">Browse</button>
-        <button id="shuffle" title="Ctrl+S">Shuffle</button>
-        <button id="clear">Clear</button>
-      </div>
-    </header>
 
-    <div class="filters">
-      <input id="filter" type="search" placeholder="Search">
-      <select id="scope">
-        <option value="name">Track name</option>
-        <option value="artist">Artist</option>
-        <option value="filename">Filename</option>
-      </select>
-      <button id="genres-toggle">Genres</button>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Valser</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <header>
+    <img src="assets/icon.png">
+    <h1>Valser</h1>
+    <div class="actions">
+      <button id="add-dir" class="desktop" title="Ctrl+Shift+O">Add directory</button>
+      <button id="add-files" class="desktop" title="Ctrl+O">Add files</button>
+      <button id="browse" class="mobile">Browse</button>
+      <button id="shuffle" title="Ctrl+S">Shuffle</button>
+      <button id="clear">Clear</button>
     </div>
+  </header>
 
-    <div id="loading" hidden>
-      <span id="loading-text"></span>
-      <progress id="loading-bar"></progress>
+  <div class="filters">
+    <input id="filter" type="search" placeholder="Search">
+    <select id="scope">
+      <option value="name">Track name</option>
+      <option value="artist">Artist</option>
+      <option value="filename">Filename</option>
+    </select>
+    <button id="genres-toggle">Genres</button>
+  </div>
+
+  <div id="loading" hidden>
+    <span id="loading-text"></span>
+    <progress id="loading-bar"></progress>
+  </div>
+
+  <main>
+    <aside id="genres" hidden>
+      <p class="hint">Click to whitelist, shift click or long press to blacklist</p>
+      <ul id="genre-list"></ul>
+      <button id="clear-genres" hidden>Clear filters</button>
+    </aside>
+    <ul id="tracks"></ul>
+    <p id="empty" hidden>No tracks, add some music to get started.</p>
+  </main>
+
+  <footer>
+    <h4 id="now"></h4>
+    <div class="seek">
+      <span id="time">00:00 / 00:00</span>
+      <input id="seek" type="range" min="0" max="0" step="0.1" value="0">
     </div>
+    <div class="transport">
+      <button id="prev"><img src="assets/previous.svg"></button>
+      <button id="play"><img src="assets/play.svg" id="play-icon"></button>
+      <button id="stop"><img src="assets/stop.svg"></button>
+      <button id="next"><img src="assets/next.svg"></button>
+      <input id="volume" type="range" min="0" max="1" step="0.01" value="1" title="Volume">
+    </div>
+  </footer>
 
-    <main>
-      <aside id="genres" hidden>
-        <p class="hint">Click to whitelist, shift click or long press to blacklist</p>
-        <ul id="genre-list"></ul>
-        <button id="clear-genres" hidden>Clear filters</button>
-      </aside>
-      <ul id="tracks"></ul>
-      <p id="empty" hidden>No tracks, add some music to get started.</p>
-    </main>
+  <dialog id="browser">
+    <div class="browser-head">
+      <button id="up">Up</button>
+      <span id="cwd"></span>
+      <button id="close-browser">Close</button>
+    </div>
+    <ul id="entries"></ul>
+  </dialog>
 
-    <footer>
-      <div class="seek">
-        <span id="time">00:00 / 00:00</span>
-        <input id="seek" type="range" min="0" max="0" step="0.1" value="0">
-      </div>
-      <div class="transport">
-        <button id="prev">Prev</button>
-        <button id="play">Play</button>
-        <button id="stop">Stop</button>
-        <button id="next">Next</button>
-        <input id="volume" type="range" min="0" max="1" step="0.01" value="1" title="Volume">
-        <span id="now"></span>
-      </div>
-    </footer>
+  <script src="main.js"></script>
+</body>
 
-    <dialog id="browser">
-      <div class="browser-head">
-        <button id="up">Up</button>
-        <span id="cwd"></span>
-        <button id="close-browser">Close</button>
-      </div>
-      <ul id="entries"></ul>
-    </dialog>
-
-    <script src="main.js"></script>
-  </body>
 </html>

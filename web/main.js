@@ -32,7 +32,10 @@ function renderPlaylist(view) {
     ...view.rows.map((row) => {
       const li = el("li");
       li.dataset.index = row.index;
-      li.append(el("span", `${row.index + 1}. ${row.name}`, "name"));
+      const name_span = el("span", undefined, "name")
+      name_span.append(el("span", `${row.index + 1}.`, "track_num"))
+      name_span.append(el("span", `${row.name}`, "track_name"))
+      li.append(name_span);
       if (row.duration) li.append(el("span", formatTime(row.duration)));
       li.append(el("button", "x", "remove"));
       return li;
@@ -69,7 +72,7 @@ function renderStatus(next) {
   const changed = next.current !== status.current || next.state !== status.state;
   status = next;
 
-  $("play").textContent = status.state === "Playing" ? "Pause" : "Play";
+  $("play-icon").src = status.state === "Playing" ? "assets/pause.svg" : "assets/play.svg";
   $("stop").disabled = status.state === "Stopped";
   $("prev").disabled = !status.has_prev;
   $("next").disabled = !status.has_next;
