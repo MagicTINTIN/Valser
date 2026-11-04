@@ -1,0 +1,20 @@
+[package]
+name = "valser-core"
+version = "0.2.2"
+edition = "2024"
+
+[dependencies]
+rand = "0.10.1"
+walkdir = "2.5.0"
+lofty = "0.24.0"
+redb = "4.1.0"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"
+rodio = { version = "0.22.2", default-features = false, features = [
+    "playback",
+    "symphonia-all",
+    "symphonia-ogg",
+    "symphonia-mkv",
+] }
+symphonia = { version = "0.5", default-features = false, features = ["ogg"] }
+symphonia-adapter-libopus = "0.2"

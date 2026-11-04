@@ -1,0 +1,28 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Valser",
+  "identifier": "fr.magictintin.valser",
+  "build": {
+    "frontendDist": "../web"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "Valser",
+        "width": 800,
+        "height": 500
+      }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "android": {
+      "minSdkVersion": 28
+    },
+    "icon": [
+      "icons/icon.png",
+      "icons/icon.ico"
+    ]
+  }
+}
