@@ -37,44 +37,71 @@ function sendFilter() {
   send("filter", { text: $("filter").value, scope: $("scope").value });
 }
 
+// Only renders the visible rows, rows must have a fixed height
+function virtualList(list, rowHeight, render) {
+  const overscan = 10;
+  let items = [];
+  let range = "";
+  const draw = (force) => {
+    const count = Math.ceil(list.clientHeight / rowHeight) + 2 * overscan;
+    const start = Math.max(0, Math.min(Math.floor(list.scrollTop / rowHeight) - overscan, items.length - count));
+    const end = Math.min(items.length, start + count);
+    if (!force && range === `${start}:${end}`) return;
+    range = `${start}:${end}`;
+    list.style.setProperty("--before", `${start * rowHeight}px`);
+    list.style.setProperty("--after", `${(items.length - end) * rowHeight}px`);
+    list.replaceChildren(...items.slice(start, end).map(render));
+  };
+  list.onscroll = () => draw(false);
+  new ResizeObserver(() => draw(false)).observe(list);
+  return {
+    get items() { return items; },
+    set(next) { items = next; draw(true); },
+    refresh: () => draw(true),
+    center(i) { list.scrollTop = i * rowHeight - (list.clientHeight - rowHeight) / 2; },
+  };
+}
+
+const trackList = virtualList($("tracks"), 26, (row) => {
+  const li = el("li");
+  li.dataset.index = row.index;
+  const current = row.index === status.current;
+  li.classList.toggle("current", current);
+  li.classList.toggle("playing", current && status.state === "Playing");
+  const name_span = el("span", undefined, "name")
+  name_span.append(el("span", `${row.index + 1}.`, "track_num"))
+  name_span.append(el("span", `${row.name}`, "track_name"))
+  li.append(name_span);
+  if (row.duration) li.append(el("span", formatTime(row.duration)));
+  li.append(el("button", "x", "remove"));
+  return li;
+});
+
+let genres = [];
+const genreList = virtualList($("genre-list"), 22, (genre) => {
+  const li = el("li", `${genre.name} (${genre.count})`, genre.mode);
+  li.dataset.name = genre.name;
+  li.title = li.textContent;
+  return li;
+});
+
+function renderGenres() {
+  const search = $("genre-filter").value.toLowerCase();
+  genreList.set(genres.filter((g) => g.name.toLowerCase().includes(search)));
+}
+
 function renderPlaylist(view) {
-  $("tracks").replaceChildren(
-    ...view.rows.map((row) => {
-      const li = el("li");
-      li.dataset.index = row.index;
-      const name_span = el("span", undefined, "name")
-      name_span.append(el("span", `${row.index + 1}.`, "track_num"))
-      name_span.append(el("span", `${row.name}`, "track_name"))
-      li.append(name_span);
-      if (row.duration) li.append(el("span", formatTime(row.duration)));
-      li.append(el("button", "x", "remove"));
-      return li;
-    }),
-  );
+  trackList.set(view.rows);
   $("empty").hidden = view.total > 0;
 
-  $("genre-list").replaceChildren(
-    ...view.genres.map((genre) => {
-      const li = el("li", `${genre.name} (${genre.count})`, genre.mode);
-      li.dataset.name = genre.name;
-      return li;
-    }),
-  );
-  $("clear-genres").hidden = !view.genres.some((g) => g.mode);
+  genres = view.genres;
+  renderGenres();
+  $("clear-genres").hidden = !genres.some((g) => g.mode);
 
   if (!restored) {
     restored = true;
     $("filter").value = view.filter;
     $("scope").value = view.scope;
-  }
-  markCurrent();
-}
-
-function markCurrent() {
-  for (const li of $("tracks").children) {
-    const current = Number(li.dataset.index) === status.current;
-    li.classList.toggle("current", current);
-    li.classList.toggle("playing", current && status.state === "Playing");
   }
 }
 
@@ -102,7 +129,7 @@ function renderStatus(next) {
   $("loading-bar").max = status.queued || 1;
   $("loading-bar").value = status.loaded;
 
-  if (changed) markCurrent();
+  if (changed) trackList.refresh();
 }
 
 $("add-dir").onclick = () => invoke("pick", { folder: true });
@@ -127,6 +154,12 @@ $("genre-list").oncontextmenu = (e) => {
   if (name) send("genre", { name, blacklist: true });
 };
 $("clear-genres").onclick = () => send("clear_genres");
+$("genre-filter").oninput = renderGenres;
+
+$("now").onclick = () => {
+  const position = trackList.items.findIndex((row) => row.index === status.current);
+  if (position >= 0) trackList.center(position);
+};
 
 $("tracks").addEventListener(mobile ? "click" : "dblclick", (e) => {
   const li = e.target.closest("li");
@@ -210,10 +243,10 @@ document.addEventListener("keydown", (e) => {
   const key = e.key.toLowerCase();
 
   if (key === " " || e.key === "MediaPlayPause") send("toggle");
-  else if (e.key === "ArrowRight") send("seek_by", { secs: 0.5 });
   else if (e.key === "ArrowLeft") send("seek_by", { secs: -0.5 });
-  else if (key === "j" && !ctrl) send("seek_by", { secs: 10 });
-  else if (key === "l" && !ctrl) send("seek_by", { secs: -10 });
+  else if (e.key === "ArrowRight") send("seek_by", { secs: 0.5 });
+  else if (key === "j" && !ctrl) send("seek_by", { secs: -10 });
+  else if (key === "l" && !ctrl) send("seek_by", { secs: 10 });
   else if (e.key === "MediaTrackNext") send("next");
   else if (e.key === "MediaTrackPrevious") send("prev");
   else if (ctrl && key === "o" && !mobile) invoke("pick", { folder: e.shiftKey });
