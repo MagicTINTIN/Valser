@@ -5,8 +5,12 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
+import android.media.AudioManager
 import android.media.MediaMetadata
 import android.media.session.MediaSession
 import android.media.session.PlaybackState
@@ -44,6 +48,11 @@ class MediaService : Service() {
   private var artist = ""
   private var duration = -1L
 
+  /** Headphones unplugged or bluetooth disconnected. */
+  private val noisy = object : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) = Bridge.command("pause", 0)
+  }
+
   override fun onCreate() {
     super.onCreate()
     session = MediaSession(this, "Valser")
@@ -56,6 +65,7 @@ class MediaService : Service() {
       override fun onSeekTo(position: Long) = Bridge.command("seek", position)
     })
     session.isActive = true
+    registerReceiver(noisy, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY))
 
     getSystemService(NotificationManager::class.java)
       .createNotificationChannel(NotificationChannel(CHANNEL, "Playback", NotificationManager.IMPORTANCE_LOW))
@@ -77,6 +87,7 @@ class MediaService : Service() {
 
   override fun onDestroy() {
     instance = null
+    unregisterReceiver(noisy)
     session.release()
     super.onDestroy()
   }

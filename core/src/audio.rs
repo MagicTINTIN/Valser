@@ -1,3 +1,4 @@
+use rodio::cpal::StreamError;
 use rodio::source::Source;
 use rodio::{Decoder, DeviceSinkBuilder, MixerDeviceSink, Player};
 use serde::Serialize;
@@ -23,8 +24,18 @@ pub struct Audio {
 }
 
 impl Audio {
-    pub fn new() -> Option<Self> {
-        let sink = DeviceSinkBuilder::open_default_sink().ok()?;
+    /// `on_lost` is called from the audio thread when the output device goes away,
+    /// for example when headphones are plugged or unplugged.
+    pub fn new(on_lost: impl Fn() + Send + 'static) -> Option<Self> {
+        let on_error = move |err: StreamError| {
+            if matches!(err, StreamError::DeviceNotAvailable | StreamError::StreamInvalidated) {
+                on_lost();
+            }
+        };
+        let sink = DeviceSinkBuilder::from_default_device()
+            .and_then(|builder| builder.with_error_callback(on_error).open_stream())
+            .or_else(|_| DeviceSinkBuilder::open_default_sink())
+            .ok()?;
         let player = Player::connect_new(sink.mixer());
         Some(Self { _sink: sink, player })
     }

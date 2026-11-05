@@ -36,6 +36,8 @@ pub enum Cmd {
     Queued(usize),
     #[serde(skip)]
     Loaded(Vec<TrackRecord>),
+    #[serde(skip)]
+    DeviceLost(u64),
 }
 
 /// Playback info shared with the system media controls.
@@ -89,6 +91,8 @@ struct Engine {
     tx: Sender<Cmd>,
     store: Store,
     audio: Option<Audio>,
+    /// Bumped on each output reopen, so errors from an old output are ignored.
+    output: u64,
     playlist: Playlist,
     filter: String,
     scope: FilterScope,
@@ -112,15 +116,12 @@ pub fn spawn(app: AppHandle, store: Store) -> Sender<Cmd> {
     let engine_tx = tx.clone();
 
     std::thread::spawn(move || {
-        let audio = Audio::new();
-        if audio.is_none() {
-            eprintln!("Failed to open audio output device");
-        }
         let mut engine = Engine {
             app,
             tx: engine_tx,
             store,
-            audio,
+            audio: None,
+            output: 0,
             playlist: Playlist::default(),
             filter: String::new(),
             scope: FilterScope::default(),
@@ -134,6 +135,7 @@ pub fn spawn(app: AppHandle, store: Store) -> Sender<Cmd> {
             #[cfg(target_os = "linux")]
             mpris,
         };
+        engine.open_output();
         engine.restore();
         loop {
             match rx.recv_timeout(TICK) {
@@ -217,6 +219,8 @@ impl Engine {
                 self.queued += count;
             }
             Cmd::Loaded(records) => self.insert(records),
+            Cmd::DeviceLost(output) if output == self.output => self.reopen_output(),
+            Cmd::DeviceLost(_) => {}
         }
         self.emit_status();
     }
@@ -236,7 +240,39 @@ impl Engine {
         self.emit_status();
     }
 
+    fn open_output(&mut self) {
+        self.audio = None;
+        self.output += 1;
+        let (tx, output) = (self.tx.clone(), self.output);
+        self.audio = Audio::new(move || {
+            let _ = tx.send(Cmd::DeviceLost(output));
+        });
+        match &mut self.audio {
+            Some(audio) => audio.set_volume(self.volume),
+            None => eprintln!("Failed to open audio output device"),
+        }
+    }
+
+    /// Opens the new default output and continues the current track where it was.
+    fn reopen_output(&mut self) {
+        let position = self.audio.as_ref().map(|a| a.position().as_secs_f64());
+        let was = self.state;
+        self.open_output();
+        let (Some(index), Some(position)) = (self.playlist.current, position) else { return };
+        if was == PlaybackState::Stopped {
+            return;
+        }
+        self.resume = Some((self.playlist.tracks[index].id, position));
+        self.play(index);
+        if was == PlaybackState::Paused {
+            self.toggle();
+        }
+    }
+
     fn play(&mut self, index: usize) {
+        if self.audio.is_none() {
+            self.open_output();
+        }
         let Some(track) = self.playlist.tracks.get(index) else { return };
         let Some(audio) = &mut self.audio else { return };
         self.playlist.current = Some(index);
