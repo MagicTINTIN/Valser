@@ -1,11 +1,13 @@
 use crossbeam_channel::{RecvTimeoutError, Sender};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
 use valser_core::audio::{Audio, PlaybackState};
+use valser_core::equalizer::{BANDS, EqConfig, EqSettings};
 use valser_core::playlist::{FilterScope, Playlist, Track, collect_audio_files};
-use valser_core::store::{AppState, Store, TrackRecord};
+use valser_core::store::{AppState, Settings, Store, TrackRecord};
 
 const TICK: Duration = Duration::from_millis(250);
 const SAVE_POSITION_EVERY: Duration = Duration::from_secs(5);
@@ -32,6 +34,7 @@ pub enum Cmd {
     Genre { name: String, blacklist: bool },
     ClearGenres,
     Add { paths: Vec<PathBuf> },
+    Equalizer { config: EqConfig },
     #[serde(skip)]
     Queued(usize),
     #[serde(skip)]
@@ -73,6 +76,12 @@ struct PlaylistView<'a> {
 }
 
 #[derive(Serialize)]
+struct EqualizerView {
+    bands: [f32; 16],
+    config: EqConfig,
+}
+
+#[derive(Serialize)]
 struct Status<'a> {
     state: PlaybackState,
     position: f64,
@@ -90,6 +99,8 @@ struct Engine {
     app: AppHandle,
     tx: Sender<Cmd>,
     store: Store,
+    settings: Settings,
+    eq: Arc<EqSettings>,
     audio: Option<Audio>,
     /// Bumped on each output reopen, so errors from an old output are ignored.
     output: u64,
@@ -119,7 +130,9 @@ pub fn spawn(app: AppHandle, store: Store) -> Sender<Cmd> {
         let mut engine = Engine {
             app,
             tx: engine_tx,
+            settings: store.load_settings(),
             store,
+            eq: Arc::default(),
             audio: None,
             output: 0,
             playlist: Playlist::default(),
@@ -135,6 +148,7 @@ pub fn spawn(app: AppHandle, store: Store) -> Sender<Cmd> {
             #[cfg(target_os = "linux")]
             mpris,
         };
+        engine.eq.set(&engine.settings.equalizer);
         engine.open_output();
         engine.restore();
         loop {
@@ -151,7 +165,11 @@ pub fn spawn(app: AppHandle, store: Store) -> Sender<Cmd> {
 impl Engine {
     fn handle(&mut self, cmd: Cmd) {
         match cmd {
-            Cmd::Ready => self.emit_playlist(),
+            Cmd::Ready => {
+                self.emit_playlist();
+                let view = EqualizerView { bands: BANDS, config: self.settings.equalizer };
+                let _ = self.app.emit("equalizer", &view);
+            }
             Cmd::Play { index } => self.play(index),
             Cmd::Toggle => self.toggle(),
             Cmd::Pause if self.state == PlaybackState::Playing => self.toggle(),
@@ -211,6 +229,13 @@ impl Engine {
                 self.changed();
             }
             Cmd::Add { paths } => self.load(paths),
+            Cmd::Equalizer { config } => {
+                self.eq.set(&config);
+                self.settings.equalizer = config;
+                if let Err(e) = self.store.save_settings(&self.settings) {
+                    eprintln!("Failed to save settings: {e}");
+                }
+            }
             Cmd::Queued(count) => {
                 if self.loaded == self.queued {
                     self.loaded = 0;
@@ -244,7 +269,7 @@ impl Engine {
         self.audio = None;
         self.output += 1;
         let (tx, output) = (self.tx.clone(), self.output);
-        self.audio = Audio::new(move || {
+        self.audio = Audio::new(self.eq.clone(), move || {
             let _ = tx.send(Cmd::DeviceLost(output));
         });
         match &mut self.audio {

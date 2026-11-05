@@ -6,7 +6,17 @@ const send = (type, args = {}) => invoke("send", { cmd: { type, ...args } });
 const mobile = /android/i.test(navigator.userAgent);
 document.body.classList.toggle("mobile", mobile);
 
+const presets = {
+  Bass: [6, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  Treble: [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 6],
+  Vocal: [-3, -3, -2, -2, -1, 0, 1, 2, 3, 3, 3, 2, 1, 0, -1, -2],
+  Rock: [4, 4, 3, 2, 1, 0, -1, -2, -2, -1, 0, 1, 2, 3, 4, 4],
+  Electronic: [5, 5, 4, 3, 1, 0, -1, -1, 0, 0, 1, 2, 3, 3, 4, 4],
+  Classical: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -2, -2, -3, -4],
+};
+
 let status = {};
+let eq = null;
 let seeking = false;
 let restored = false;
 
@@ -136,6 +146,59 @@ $("seek").onchange = () => {
 };
 $("volume").oninput = () => send("volume", { value: Number($("volume").value) });
 
+function formatFreq(freq) {
+  return freq >= 1000 ? `${freq / 1000}k` : `${freq}`;
+}
+
+function renderEqualizer(view) {
+  eq = view.config;
+  $("eq-enabled").checked = eq.enabled;
+  $("eq-bands").replaceChildren(
+    ...view.bands.map((freq, i) => {
+      const input = el("input");
+      Object.assign(input, { type: "range", min: -12, max: 12, step: 0.5, value: eq.gains[i] });
+      input.dataset.band = i;
+      input.title = `${eq.gains[i]} dB`;
+      const band = el("label", undefined, "band");
+      band.append(input, el("span", formatFreq(freq)));
+      return band;
+    }),
+  );
+}
+
+function setGains(gains) {
+  eq.gains = [...gains];
+  $("eq-bands").querySelectorAll("input").forEach((input, i) => {
+    input.value = gains[i];
+    input.title = `${gains[i]} dB`;
+  });
+  send("equalizer", { config: eq });
+}
+
+$("eq-preset").append(...Object.keys(presets).map((name) => el("option", name)));
+$("eq-toggle").onclick = () => {
+  $("eq").hidden = !$("eq").hidden;
+  $("eq-toggle").classList.toggle("active", !$("eq").hidden);
+};
+$("eq-enabled").onchange = () => {
+  eq.enabled = $("eq-enabled").checked;
+  send("equalizer", { config: eq });
+};
+$("eq-preset").onchange = () => {
+  if ($("eq-preset").value) setGains(presets[$("eq-preset").value]);
+};
+$("eq-reset").onclick = () => {
+  $("eq-preset").value = "";
+  setGains(Array(16).fill(0));
+};
+$("eq-bands").oninput = (e) => {
+  const value = Number(e.target.value);
+  eq.gains[e.target.dataset.band] = value;
+  e.target.title = `${value} dB`;
+  $("eq-preset").value = "";
+  send("equalizer", { config: eq });
+};
+
 $("prev").onclick = () => send("prev");
 $("play").onclick = () => send("toggle");
 $("stop").onclick = () => send("stop");
@@ -201,4 +264,5 @@ $("close-browser").onclick = () => $("browser").close();
 Promise.all([
   listen("playlist", (e) => renderPlaylist(e.payload)),
   listen("status", (e) => renderStatus(e.payload)),
+  listen("equalizer", (e) => renderEqualizer(e.payload)),
 ]).then(() => send("ready"));

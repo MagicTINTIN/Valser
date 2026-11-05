@@ -127,6 +127,14 @@ ul { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
   border-radius: 4px;
 }
 
+#eq { display: flex; flex-direction: column; gap: 6px; }
+.eq-head { display: flex; align-items: center; gap: 8px; }
+#eq-bands { display: grid; grid-template-columns: repeat(16, 1fr); }
+.band { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 10px; color: var(--muted); }
+/* Rotated horizontal sliders, vertical ones go in opposite directions in WebKit and Chromium */
+.band input { width: 120px; height: 20px; margin: 50px -50px; transform: rotate(-90deg); }
+#eq:has(#eq-enabled:not(:checked)) #eq-bands { opacity: 0.4; }
+
 #browser {
   width: min(500px, 95vw);
   height: 80vh;

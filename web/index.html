@@ -57,7 +57,18 @@
       <button id="play"><img src="assets/play.svg" id="play-icon"></button>
       <button id="stop"><img src="assets/stop.svg"></button>
       <button id="next"><img src="assets/next.svg"></button>
+      <button id="eq-toggle">EQ</button>
       <input id="volume" type="range" min="0" max="1" step="0.01" value="1" title="Volume">
+    </div>
+    <div id="eq" hidden>
+      <div class="eq-head">
+        <label><input id="eq-enabled" type="checkbox"> Enabled</label>
+        <select id="eq-preset">
+          <option value="">Presets</option>
+        </select>
+        <button id="eq-reset">Reset</button>
+      </div>
+      <div id="eq-bands"></div>
     </div>
   </footer>
 

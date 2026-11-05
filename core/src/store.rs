@@ -2,6 +2,7 @@ use redb::{Database, ReadableDatabase, ReadableTable, TableDefinition, TableHand
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
+use crate::equalizer::EqConfig;
 use crate::playlist::FilterScope;
 
 // Table definitions
@@ -36,11 +37,18 @@ pub struct AppState {
     pub genre_blacklist: Vec<String>,
 }
 
+/// Stored in settings.json
+#[derive(Serialize, Deserialize, Default, Clone, Debug)]
+#[serde(default)]
+pub struct Settings {
+    pub equalizer: EqConfig,
+}
+
 pub struct Store {
     library: Database,      // all the tracks added in the player
     playback: Database,     // all tracks passing filters
     state_path: PathBuf,    // player state file path
-    _settings_path: PathBuf, // app settings file path
+    settings_path: PathBuf,  // app settings file path
 }
 
 impl Store {
@@ -67,7 +75,7 @@ impl Store {
             library,
             playback,
             state_path: data_dir.join("state.json"),
-            _settings_path: config_dir.join("settings.json"),
+            settings_path: config_dir.join("settings.json"),
         })
     }
 
@@ -179,19 +187,19 @@ impl Store {
     // App state (playlist order + filters)
 
     pub fn save_state(&self, state: &AppState) -> Result<(), Box<dyn std::error::Error>> {
-        let json = serde_json::to_string_pretty(state)?;
-        // Write to a temp file then rename for atomic replace.
-        let tmp = self.state_path.with_extension("json.tmp");
-        std::fs::write(&tmp, &json)?;
-        std::fs::rename(&tmp, &self.state_path)?;
-        Ok(())
+        write_json(&self.state_path, state)
     }
 
     pub fn load_state(&self) -> AppState {
-        std::fs::read_to_string(&self.state_path)
-            .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_default()
+        read_json(&self.state_path)
+    }
+
+    pub fn save_settings(&self, settings: &Settings) -> Result<(), Box<dyn std::error::Error>> {
+        write_json(&self.settings_path, settings)
+    }
+
+    pub fn load_settings(&self) -> Settings {
+        read_json(&self.settings_path)
     }
 
     // Playback position written every few seconds, very cheap
@@ -221,4 +229,19 @@ impl Store {
         let pos_bits = table.get("position_secs").ok()??.value();
         Some((track_id, f64::from_bits(pos_bits)))
     }
+}
+
+/// Writes to a temp file then renames it for an atomic replace.
+fn write_json(path: &Path, value: &impl Serialize) -> Result<(), Box<dyn std::error::Error>> {
+    let tmp = path.with_extension("json.tmp");
+    std::fs::write(&tmp, serde_json::to_string_pretty(value)?)?;
+    std::fs::rename(&tmp, path)?;
+    Ok(())
+}
+
+fn read_json<T: for<'de> Deserialize<'de> + Default>(path: &Path) -> T {
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
 }
