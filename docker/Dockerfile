@@ -28,7 +28,7 @@ COPY --from=linux-build /out /
 
 FROM base AS windows-build
 ARG ARCH
-RUN apt-get update && apt-get install -y --no-install-recommends nsis lld llvm clang \
+RUN apt-get update && apt-get install -y --no-install-recommends nsis lld llvm clang ninja-build \
     && rm -rf /var/lib/apt/lists/*
 RUN rustup target add $ARCH-pc-windows-msvc && cargo install cargo-xwin --locked
 COPY . .
