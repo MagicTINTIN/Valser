@@ -473,7 +473,10 @@ impl Engine {
             duration: self.duration.map(|d| d.as_secs_f64()),
             volume: self.volume,
             current: self.playlist.current,
-            title: track.map(|t| t.display_name()),
+            title: track.map(|t| match t.title.as_ref() {
+                Some(title) => title.as_str(),
+                None => t.display_name(),
+            }),
             has_prev: self.playlist.prev_track().is_some(),
             has_next: self.playlist.next_track().is_some(),
             loaded: self.loaded,
