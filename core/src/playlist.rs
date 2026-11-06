@@ -61,6 +61,9 @@ impl Track {
     }
 
     pub fn matches_filter(&self, query: &str, scope: FilterScope) -> bool {
+        if query.is_empty() {
+            return true;
+        }
         let q = query.to_lowercase();
         match scope {
             FilterScope::TrackName => self
@@ -221,6 +224,7 @@ mod tests {
         playlist.current = Some(2);
         assert_eq!(playlist.next_track(), None);
         assert_eq!(playlist.prev_track(), Some(1));
+        playlist.scope = FilterScope::FileName;
         playlist.filter = "2".into();
         assert_eq!(playlist.prev_track(), Some(1));
         playlist.current = Some(0);
