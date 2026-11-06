@@ -108,6 +108,8 @@ pub struct Playlist {
     pub genre_whitelist: HashSet<String>,
     /// Tracks having one of these genres are hidden, even if whitelisted.
     pub genre_blacklist: HashSet<String>,
+    pub filter: String,
+    pub scope: FilterScope,
 }
 
 impl Playlist {
@@ -120,16 +122,18 @@ impl Playlist {
         };
     }
 
+    /// Next track shown by the search and genre filters.
     pub fn next_track(&self) -> Option<usize> {
-        match self.current {
-            None if !self.tracks.is_empty() => Some(0),
-            Some(i) if i + 1 < self.tracks.len() => Some(i + 1),
-            _ => None,
-        }
+        let start = self.current.map_or(0, |i| i + 1);
+        (start..self.tracks.len()).find(|&i| self.is_visible(&self.tracks[i]))
     }
 
     pub fn prev_track(&self) -> Option<usize> {
-        self.current.filter(|&i| i > 0).map(|i| i - 1)
+        (0..self.current?).rev().find(|&i| self.is_visible(&self.tracks[i]))
+    }
+
+    pub fn is_visible(&self, track: &Track) -> bool {
+        track.matches_filter(&self.filter, self.scope) && self.genre_visible(track)
     }
 
     /// Shuffles the tracks, current keeps pointing to the same track.
@@ -217,6 +221,17 @@ mod tests {
         playlist.current = Some(2);
         assert_eq!(playlist.next_track(), None);
         assert_eq!(playlist.prev_track(), Some(1));
+        playlist.filter = "2".into();
+        assert_eq!(playlist.prev_track(), Some(1));
+        playlist.current = Some(0);
+        assert_eq!(playlist.next_track(), Some(1));
+        playlist.filter = "3".into();
+        assert_eq!(playlist.next_track(), Some(2));
+        playlist.genre_whitelist.insert("rock".into());
+        assert_eq!(playlist.next_track(), None);
+        playlist.filter.clear();
+        playlist.genre_whitelist.clear();
+        playlist.current = Some(2);
         playlist.remove_track(0);
         assert_eq!(playlist.current, Some(1));
         playlist.remove_track(1);

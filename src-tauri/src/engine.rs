@@ -17,24 +17,44 @@ const LOAD_CHUNK: usize = 100;
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Cmd {
     Ready,
-    Play { index: usize },
+    Play {
+        index: usize,
+    },
     Toggle,
     Pause,
     Resume,
     Stop,
     Next,
     Prev,
-    Seek { secs: f64 },
-    SeekBy { secs: f64 },
-    Volume { value: f32 },
-    Remove { index: usize },
+    Seek {
+        secs: f64,
+    },
+    SeekBy {
+        secs: f64,
+    },
+    Volume {
+        value: f32,
+    },
+    Remove {
+        index: usize,
+    },
     Clear,
     Shuffle,
-    Filter { text: String, scope: FilterScope },
-    Genre { name: String, blacklist: bool },
+    Filter {
+        text: String,
+        scope: FilterScope,
+    },
+    Genre {
+        name: String,
+        blacklist: bool,
+    },
     ClearGenres,
-    Add { paths: Vec<PathBuf> },
-    Equalizer { config: EqConfig },
+    Add {
+        paths: Vec<PathBuf>,
+    },
+    Equalizer {
+        config: EqConfig,
+    },
     #[serde(skip)]
     Queued(usize),
     #[serde(skip)]
@@ -105,8 +125,6 @@ struct Engine {
     /// Bumped on each output reopen, so errors from an old output are ignored.
     output: u64,
     playlist: Playlist,
-    filter: String,
-    scope: FilterScope,
     state: PlaybackState,
     duration: Option<Duration>,
     volume: f32,
@@ -136,8 +154,6 @@ pub fn spawn(app: AppHandle, store: Store) -> Sender<Cmd> {
             audio: None,
             output: 0,
             playlist: Playlist::default(),
-            filter: String::new(),
-            scope: FilterScope::default(),
             state: PlaybackState::Stopped,
             duration: None,
             volume: 1.0,
@@ -167,7 +183,10 @@ impl Engine {
         match cmd {
             Cmd::Ready => {
                 self.emit_playlist();
-                let view = EqualizerView { bands: BANDS, config: self.settings.equalizer };
+                let view = EqualizerView {
+                    bands: BANDS,
+                    config: self.settings.equalizer,
+                };
                 let _ = self.app.emit("equalizer", &view);
             }
             Cmd::Play { index } => self.play(index),
@@ -176,11 +195,22 @@ impl Engine {
             Cmd::Resume if self.state != PlaybackState::Playing => self.toggle(),
             Cmd::Pause | Cmd::Resume => {}
             Cmd::Stop => self.stop(),
-            Cmd::Next => self.playlist.next_track().into_iter().for_each(|i| self.play(i)),
-            Cmd::Prev => self.playlist.prev_track().into_iter().for_each(|i| self.play(i)),
+            Cmd::Next => self
+                .playlist
+                .next_track()
+                .into_iter()
+                .for_each(|i| self.play(i)),
+            Cmd::Prev => self
+                .playlist
+                .prev_track()
+                .into_iter()
+                .for_each(|i| self.play(i)),
             Cmd::Seek { secs } => self.seek(secs),
             Cmd::SeekBy { secs } => {
-                let position = self.audio.as_ref().map_or(0.0, |a| a.position().as_secs_f64());
+                let position = self
+                    .audio
+                    .as_ref()
+                    .map_or(0.0, |a| a.position().as_secs_f64());
                 self.seek(position + secs);
             }
             Cmd::Volume { value } => {
@@ -190,7 +220,9 @@ impl Engine {
                 }
             }
             Cmd::Remove { index } => {
-                let Some(track) = self.playlist.tracks.get(index) else { return };
+                let Some(track) = self.playlist.tracks.get(index) else {
+                    return;
+                };
                 let _ = self.store.remove_track(track.id);
                 let was_current = self.playlist.current == Some(index);
                 self.playlist.remove_track(index);
@@ -211,15 +243,21 @@ impl Engine {
                 self.changed();
             }
             Cmd::Filter { text, scope } => {
-                self.filter = text;
-                self.scope = scope;
+                self.playlist.filter = text;
+                self.playlist.scope = scope;
                 self.changed();
             }
-            Cmd::Genre { name, blacklist: true } => {
+            Cmd::Genre {
+                name,
+                blacklist: true,
+            } => {
                 self.playlist.toggle_blacklist(&name);
                 self.changed();
             }
-            Cmd::Genre { name, blacklist: false } => {
+            Cmd::Genre {
+                name,
+                blacklist: false,
+            } => {
                 self.playlist.toggle_whitelist(&name);
                 self.changed();
             }
@@ -283,7 +321,9 @@ impl Engine {
         let position = self.audio.as_ref().map(|a| a.position().as_secs_f64());
         let was = self.state;
         self.open_output();
-        let (Some(index), Some(position)) = (self.playlist.current, position) else { return };
+        let (Some(index), Some(position)) = (self.playlist.current, position) else {
+            return;
+        };
         if was == PlaybackState::Stopped {
             return;
         }
@@ -298,7 +338,9 @@ impl Engine {
         if self.audio.is_none() {
             self.open_output();
         }
-        let Some(track) = self.playlist.tracks.get(index) else { return };
+        let Some(track) = self.playlist.tracks.get(index) else {
+            return;
+        };
         let Some(audio) = &mut self.audio else { return };
         self.playlist.current = Some(index);
         self.duration = audio.play(&track.path);
@@ -318,7 +360,11 @@ impl Engine {
             }
         } else if let Some(audio) = &mut self.audio {
             audio.toggle_pause();
-            self.state = if audio.is_paused() { PlaybackState::Paused } else { PlaybackState::Playing };
+            self.state = if audio.is_paused() {
+                PlaybackState::Paused
+            } else {
+                PlaybackState::Playing
+            };
         }
     }
 
@@ -343,7 +389,10 @@ impl Engine {
             let files = collect_audio_files(paths);
             let _ = tx.send(Cmd::Queued(files.len()));
             for chunk in files.chunks(LOAD_CHUNK) {
-                let records = chunk.iter().map(|p| Track::new(p.clone()).to_record()).collect();
+                let records = chunk
+                    .iter()
+                    .map(|p| Track::new(p.clone()).to_record())
+                    .collect();
                 let _ = tx.send(Cmd::Loaded(records));
             }
         });
@@ -353,7 +402,11 @@ impl Engine {
         self.loaded += records.len();
         match self.store.insert_tracks_batch(&records) {
             Ok(ids) => {
-                for (record, id) in records.into_iter().zip(ids).filter_map(|(r, id)| Some((r, id?))) {
+                for (record, id) in records
+                    .into_iter()
+                    .zip(ids)
+                    .filter_map(|(r, id)| Some((r, id?)))
+                {
                     if !self.playlist.tracks.iter().any(|t| t.id == id) {
                         let mut track = Track::from_record(record);
                         track.id = id;
@@ -378,12 +431,18 @@ impl Engine {
         } else {
             self.store.load_tracks_by_ids(&state.playlist_order)
         };
-        self.playlist.tracks = records.unwrap_or_default().into_iter().map(Track::from_record).collect();
+        self.playlist.tracks = records
+            .unwrap_or_default()
+            .into_iter()
+            .map(Track::from_record)
+            .collect();
         self.playlist.genre_whitelist = state.genre_whitelist.into_iter().collect();
         self.playlist.genre_blacklist = state.genre_blacklist.into_iter().collect();
-        self.playlist.current = state.current_index.filter(|&i| i < self.playlist.tracks.len());
-        self.filter = state.filter_text;
-        self.scope = state.filter_scope;
+        self.playlist.current = state
+            .current_index
+            .filter(|&i| i < self.playlist.tracks.len());
+        self.playlist.filter = state.filter_text;
+        self.playlist.scope = state.filter_scope;
 
         if let Some((id, secs)) = self.store.load_position()
             && let Some(index) = self.playlist.tracks.iter().position(|t| t.id == id)
@@ -402,8 +461,8 @@ impl Engine {
         let state = AppState {
             playlist_order: self.playlist.tracks.iter().map(|t| t.id).collect(),
             current_index: self.playlist.current,
-            filter_text: self.filter.clone(),
-            filter_scope: self.scope,
+            filter_text: self.playlist.filter.clone(),
+            filter_scope: self.playlist.scope,
             genre_whitelist: self.playlist.genre_whitelist.iter().cloned().collect(),
             genre_blacklist: self.playlist.genre_blacklist.iter().cloned().collect(),
         };
@@ -415,12 +474,16 @@ impl Engine {
     fn save_position(&mut self) {
         self.last_save = Instant::now();
         if let (Some(track), Some(audio)) = (self.current_track(), &self.audio) {
-            let _ = self.store.save_position(track.id, audio.position().as_secs_f64());
+            let _ = self
+                .store
+                .save_position(track.id, audio.position().as_secs_f64());
         }
     }
 
     fn current_track(&self) -> Option<&Track> {
-        self.playlist.current.and_then(|i| self.playlist.tracks.get(i))
+        self.playlist
+            .current
+            .and_then(|i| self.playlist.tracks.get(i))
     }
 
     fn emit_playlist(&self) {
@@ -429,7 +492,7 @@ impl Engine {
             .tracks
             .iter()
             .enumerate()
-            .filter(|(_, t)| t.matches_filter(&self.filter, self.scope) && playlist.genre_visible(t))
+            .filter(|(_, t)| playlist.is_visible(t))
             .map(|(index, t)| Row {
                 index,
                 name: t.display_name(),
@@ -455,8 +518,8 @@ impl Engine {
             rows,
             total: playlist.tracks.len(),
             genres,
-            filter: &self.filter,
-            scope: self.scope,
+            filter: &self.playlist.filter,
+            scope: self.playlist.scope,
         };
         let _ = self.app.emit("playlist", &view);
     }
@@ -464,7 +527,10 @@ impl Engine {
     fn emit_status(&self) {
         let position = match self.state {
             PlaybackState::Stopped => 0.0,
-            _ => self.audio.as_ref().map_or(0.0, |a| a.position().as_secs_f64()),
+            _ => self
+                .audio
+                .as_ref()
+                .map_or(0.0, |a| a.position().as_secs_f64()),
         };
         let track = self.current_track();
         let status = Status {
