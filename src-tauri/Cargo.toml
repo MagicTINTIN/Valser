@@ -9,6 +9,9 @@ edition = "2024"
 
 [package.metadata.release]
 pre-release-hook = ["git", "-C", "..", "cliff", "-o", "CHANGELOG.md", "--tag", "{{tag_name}}"]
+pre-release-replacements = [
+    { file = "tauri.conf.json", search = '"version": "[^"]*"', replace = '"version": "{{version}}"', exactly = 1 },
+]
 
 [lib]
 name = "valser_lib"

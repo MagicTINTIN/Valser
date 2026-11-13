@@ -81,7 +81,7 @@ Release, then push:
 git push --follow-tags
 ```
 
-`release.sh` sets the version of both crates, updates `CHANGELOG.md`, commits `chore(release): X.Y.Z` and tags `vX.Y.Z`. It asks for confirmation and pushes nothing. The app shows this version next to its title, and the Android version code is derived from it.
+`release.sh` sets the version of both crates and `tauri.conf.json`, updates `CHANGELOG.md`, commits `chore(release): X.Y.Z` and tags `vX.Y.Z`. It asks for confirmation and pushes nothing. The app shows this version next to its title, and the Android version code is derived from it.
 
 ## CI
 
