@@ -83,10 +83,13 @@ git push --follow-tags
 
 `release.sh` sets the version of both crates and `tauri.conf.json`, updates `CHANGELOG.md`, commits `chore(release): X.Y.Z` and tags `vX.Y.Z`. It asks for confirmation and pushes nothing. The app shows this version next to its title, and the Android version code is derived from it.
 
+Pushing the tag starts `Build`, which publishes the GitHub release with every target's files. Its notes are the `CHANGELOG.md` sections since the last GitHub release.
+
 ## CI
 
 - `CI`: runs the tests on every push and pull request.
-- `Build`: started manually from the Actions tab, builds all targets.
+- `Build`: builds all targets on each `vX.Y.Z` tag and publishes the release. Started manually, it only builds, files are then in the Artifacts section of the run.
+- `Build Android only`: started manually. Run on a tag, it adds the APK to that tag's release, otherwise it only builds.
 
 Android signing secrets for `Build`:
 
