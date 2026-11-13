@@ -4,6 +4,13 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 ---
+## [\<1.0.1\>](https://github.com/MagicTINTIN/Valser/releases/v1.0.1) - 2026-11-13 <small><small><small>[(compare)](https://github.com/MagicTINTIN/Valser/compare/v1.0.0..v1.0.1)</small></small></small>
+
+### 🚜 Refactor
+
+- changing android version too (in tauri) <small><small>[(cb0c0b7)](https://github.com/MagicTINTIN/Valser/commit/cb0c0b714a2e603d452040ea2ebee3c4be7c26b2)</small></small>
+
+---
 ## [\<1.0.0\>](https://github.com/MagicTINTIN/Valser/releases/v1.0.0) - 2026-11-13 <small><small><small>[(compare)](https://github.com/MagicTINTIN/Valser/compare/v0.2.2..v1.0.0)</small></small></small>
 
 ### 🚀 Features
@@ -32,6 +39,10 @@ All notable changes to this project will be documented in this file. See [conven
 -  **⚠️ breaking!** switch to tauri (#16) <small>[**\[#16\]**](https://github.com/MagicTINTIN/Valser/issues/16)</small> <small><small>[(385b5d1)](https://github.com/MagicTINTIN/Valser/commit/385b5d1289ed6f56db3cc0e3a17aef25f2ccb620)</small></small>
 - prev/next now skips hidden tracks <small><small>[(d32baf0)](https://github.com/MagicTINTIN/Valser/commit/d32baf0ca24ab3e38e3dae881b54714ea2b1bfde)</small></small>
 - adding versionning with git cliff <small><small>[(59ec4ed)](https://github.com/MagicTINTIN/Valser/commit/59ec4edcb8cd1ad312f7f45271761ac57bde742e)</small></small>
+
+### ⚙️ Miscellaneous Chores
+
+- **(release)** 1.0.0 <small><small>[(d5e33f3)](https://github.com/MagicTINTIN/Valser/commit/d5e33f3b1751b170c7d3e3844dcb6528077b3142)</small></small>
 
 ### 🎨 Style
 
