@@ -3,6 +3,9 @@ name = "valser-core"
 version = "0.2.2"
 edition = "2024"
 
+[package.metadata.release]
+tag = false
+
 [dependencies]
 rand = "0.10.1"
 walkdir = "2.5.0"

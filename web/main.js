@@ -4,6 +4,7 @@ const { listen } = window.__TAURI__.event;
 const $ = (id) => document.getElementById(id);
 const send = (type, args = {}) => invoke("send", { cmd: { type, ...args } });
 const mobile = /android/i.test(navigator.userAgent);
+window.__TAURI__.app.getVersion().then((version) => ($("version").textContent = `v${version}`));
 document.body.classList.toggle("mobile", mobile);
 
 const presets = {

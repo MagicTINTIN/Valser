@@ -61,6 +61,7 @@ header, .filters, .transport, .seek, #loading, .browser-head {
 
 header { justify-content: space-between; flex-wrap: wrap; }
 h1 { margin: 0; font-size: 20px; }
+#version { font-size: 12px; font-weight: normal; color: var(--muted); }
 .actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
 header img {

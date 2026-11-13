@@ -61,6 +61,28 @@ adb install -r dist/android/valser.apk
 adb logcat --pid=$(adb shell pidof -s fr.magictintin.valser) 2>/dev/null
 ```
 
+## Release
+
+Requires `git-cliff` and `cargo-release`. Commits follow [conventional commits](https://www.conventionalcommits.org), the new version is computed from the commits since the last tag:
+
+- `feat`: minor
+- `!` after the type (`refactor!:`) or `BREAKING CHANGE` in the body: major
+- anything else: patch
+
+Preview the next version and its changelog:
+```sh
+git cliff --bumped-version
+git cliff --unreleased --bump
+```
+
+Release, then push:
+```sh
+./release.sh
+git push --follow-tags
+```
+
+`release.sh` sets the version of both crates, updates `CHANGELOG.md`, commits `chore(release): X.Y.Z` and tags `vX.Y.Z`. It asks for confirmation and pushes nothing. The app shows this version next to its title, and the Android version code is derived from it.
+
 ## CI
 
 - `CI`: runs the tests on every push and pull request.
