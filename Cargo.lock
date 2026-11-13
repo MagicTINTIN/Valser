@@ -4625,7 +4625,7 @@ dependencies = [
 
 [[package]]
 name = "valser"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "crossbeam-channel",
  "jni",
@@ -4640,7 +4640,7 @@ dependencies = [
 
 [[package]]
 name = "valser-core"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "lofty",
  "opusic-sys",

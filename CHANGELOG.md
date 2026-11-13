@@ -4,11 +4,27 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 ---
+## [\<1.0.2\>](https://github.com/MagicTINTIN/Valser/releases/v1.0.2) - 2026-11-13 <small><small><small>[(compare)](https://github.com/MagicTINTIN/Valser/compare/v1.0.1..v1.0.2)</small></small></small>
+
+### 🎨 Style
+
+- fix force scale <small><small>[(903ed56)](https://github.com/MagicTINTIN/Valser/commit/903ed560efcfb7755c1c90e05cfdacc3bb31f349)</small></small>
+
+### ✅ Continuous Integration
+
+- adding log for keystore <small><small>[(170cf89)](https://github.com/MagicTINTIN/Valser/commit/170cf89378cda3ca76f2ab98645bf048095d2ae2)</small></small>
+- create releases <small><small>[(a088a3f)](https://github.com/MagicTINTIN/Valser/commit/a088a3fe185bc4bdbe5a9091b4e2446b67c6fc53)</small></small>
+
+---
 ## [\<1.0.1\>](https://github.com/MagicTINTIN/Valser/releases/v1.0.1) - 2026-11-13 <small><small><small>[(compare)](https://github.com/MagicTINTIN/Valser/compare/v1.0.0..v1.0.1)</small></small></small>
 
 ### 🚜 Refactor
 
 - changing android version too (in tauri) <small><small>[(cb0c0b7)](https://github.com/MagicTINTIN/Valser/commit/cb0c0b714a2e603d452040ea2ebee3c4be7c26b2)</small></small>
+
+### ⚙️ Miscellaneous Chores
+
+- **(release)** 1.0.1 <small><small>[(13394fa)](https://github.com/MagicTINTIN/Valser/commit/13394fa1f7a94fab81286528647f65a8c18f23b1)</small></small>
 
 ---
 ## [\<1.0.0\>](https://github.com/MagicTINTIN/Valser/releases/v1.0.0) - 2026-11-13 <small><small><small>[(compare)](https://github.com/MagicTINTIN/Valser/compare/v0.2.2..v1.0.0)</small></small></small>
