@@ -18,3 +18,7 @@ rodio = { version = "0.22.2", default-features = false, features = [
 ] }
 symphonia = { version = "0.5", default-features = false, features = ["ogg"] }
 symphonia-adapter-libopus = "0.2"
+
+# Opus NEON detection does not build with clang-cl on Windows arm64
+[target.'cfg(all(windows, target_arch = "aarch64"))'.dependencies]
+opusic-sys = { version = "0.7.3", features = ["no-simd"] }

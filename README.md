@@ -50,7 +50,7 @@ keytool -genkey -v \
   -alias valser \
   -keyalg RSA \
   -keysize 2048 \
-  -validity 10000
+  -validity 30000
 
 ANDROID_KEYSTORE=~/.android/valser-release.keystore ANDROID_KEYSTORE_PASSWORD=secret ./build.sh android
 ```
@@ -68,5 +68,5 @@ adb logcat --pid=$(adb shell pidof -s fr.magictintin.valser) 2>/dev/null
 
 Android signing secrets for `Build`:
 
-- `ANDROID_KEYSTORE_BASE64`: output of `base64 -w0 release.jks`
+- `ANDROID_KEYSTORE_BASE64`: output of `base64 -w0 ~/.android/valser-release.keystore`
 - `ANDROID_KEYSTORE_PASSWORD`

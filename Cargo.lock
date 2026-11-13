@@ -4643,6 +4643,7 @@ name = "valser-core"
 version = "0.2.2"
 dependencies = [
  "lofty",
+ "opusic-sys",
  "rand",
  "redb",
  "rodio",
