@@ -4,17 +4,54 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 ---
-## [\<0.2.2\>](https://github.com/MagicTINTIN/Valser/releases/v0.2.2) - 2026-07-06 <small><small><small>[(compare)](https://github.com/MagicTINTIN/Valser/compare/v0.2.0..v0.2.2)</small></small></small>
+## [\<1.0.0\>](https://github.com/MagicTINTIN/Valser/releases/v1.0.0) - 2026-11-13 <small><small><small>[(compare)](https://github.com/MagicTINTIN/Valser/compare/v0.2.2..v1.0.0)</small></small></small>
+
+### 🚀 Features
+
+- valser android build (the app exists) + signature setup <small><small>[(47b3f51)](https://github.com/MagicTINTIN/Valser/commit/47b3f51e43618abba4c3200b5e26379e282bfde3)</small></small>
+- adding music activity for android <small><small>[(e6cae18)](https://github.com/MagicTINTIN/Valser/commit/e6cae1828db9e0035d93bf337c1ad904bad35399)</small></small>
+- adding basic equalizer <small><small>[(7e56b14)](https://github.com/MagicTINTIN/Valser/commit/7e56b14075e52ea3fcfe038b1cee5b0e9ca4f7ce)</small></small>
+
+### 🐛 Bug Fixes
+
+- file picker undefined functions <small><small>[(e6572c6)](https://github.com/MagicTINTIN/Valser/commit/e6572c6ca2c9392994ef474f81c7a70836179208)</small></small>
+- build for android and switching opus lib bc deprecated <small><small>[(d216de9)](https://github.com/MagicTINTIN/Valser/commit/d216de972e8ef08d15adbb0599beccd9a3fa89d6)</small></small>
+- the app now starts on android <small><small>[(cdd0f70)](https://github.com/MagicTINTIN/Valser/commit/cdd0f70dd485a56df02178cdd20f4dd37256a2db)</small></small>
+- sink error when unplugging headphone <small><small>[(eef93cf)](https://github.com/MagicTINTIN/Valser/commit/eef93cf9e8cd4ba7c501392969186ec37404f6f3)</small></small>
+- title status <small><small>[(7fe8f65)](https://github.com/MagicTINTIN/Valser/commit/7fe8f65390bd209af10324a74c66defa8ef7a50c)</small></small>
+- not empty query <small><small>[(2f59c67)](https://github.com/MagicTINTIN/Valser/commit/2f59c671396d9eabfb41acaab4e0dcc9662c9b21)</small></small>
+- missing builder for windows <small><small>[(7eaaa37)](https://github.com/MagicTINTIN/Valser/commit/7eaaa3717212693053e17167dec20a9ef632dce8)</small></small>
+
+### ⚡ Performance
+
+- displaying only visible rows <small><small>[(e32aa3b)](https://github.com/MagicTINTIN/Valser/commit/e32aa3b12ef097b57d1da97e470fc4101205a8e8)</small></small>
+
+### 🚜 Refactor
+
+- splitting to valser and valser-android, adding dependencies for android <small><small>[(0dfbe88)](https://github.com/MagicTINTIN/Valser/commit/0dfbe88823384f560799abe4a4ca0d7d726879ba)</small></small>
+-  **⚠️ breaking!** switch to tauri (#16) <small>[**\[#16\]**](https://github.com/MagicTINTIN/Valser/issues/16)</small> <small><small>[(385b5d1)](https://github.com/MagicTINTIN/Valser/commit/385b5d1289ed6f56db3cc0e3a17aef25f2ccb620)</small></small>
+- prev/next now skips hidden tracks <small><small>[(d32baf0)](https://github.com/MagicTINTIN/Valser/commit/d32baf0ca24ab3e38e3dae881b54714ea2b1bfde)</small></small>
+- adding versionning with git cliff <small><small>[(59ec4ed)](https://github.com/MagicTINTIN/Valser/commit/59ec4edcb8cd1ad312f7f45271761ac57bde742e)</small></small>
+
+### 🎨 Style
+
+- adding logo <small><small>[(3890e32)](https://github.com/MagicTINTIN/Valser/commit/3890e3247430e95465900eca2b05c7034c5a0aba)</small></small>
+- adding new icon and theme <small><small>[(bff0384)](https://github.com/MagicTINTIN/Valser/commit/bff03843b69a3d97c5019b08a51a0d0f69b7bced)</small></small>
+- adding some icons and changing displaed name <small><small>[(b44f5cf)](https://github.com/MagicTINTIN/Valser/commit/b44f5cf3be1871377b04e426024cf22acb3d0973)</small></small>
+- current music index + equalizer size <small><small>[(4f5b0f1)](https://github.com/MagicTINTIN/Valser/commit/4f5b0f1e99eff714e0133ba47ad42935cdd86fea)</small></small>
+
+### 🏗️ Build
+
+- disabling simd for windows arm build <small><small>[(c3fb3a3)](https://github.com/MagicTINTIN/Valser/commit/c3fb3a3dc71f6a01f4f5badedabefdaf2410cefd)</small></small>
+
+---
+## [\<0.2.2\>](https://github.com/MagicTINTIN/Valser/releases/v0.2.2) - 2026-07-06 <small><small><small>[(compare)](https://github.com/MagicTINTIN/Valser/compare/v0.2.1..v0.2.2)</small></small></small>
 
 ### 🚀 Features
 
 - save state each 5s <small><small>[(29c541f)](https://github.com/MagicTINTIN/Valser/commit/29c541f7dad741ddd1cbf0a50aebaba7651afe7b)</small></small>
 - saving states on actions <small>[**\[#14\]**](https://github.com/MagicTINTIN/Valser/issues/14)</small> <small><small>[(4593b88)](https://github.com/MagicTINTIN/Valser/commit/4593b889929ffd0fd02770da4eb3acb9c345de85)</small></small>
 - clear entire playlist <small><small>[(cc3bc1e)](https://github.com/MagicTINTIN/Valser/commit/cc3bc1e0c721e49c1098faf818e36ccb7c3ffe77)</small></small>
-
-### 🐛 Bug Fixes
-
-- using pre release hook of git cliff <small><small>[(2154694)](https://github.com/MagicTINTIN/Valser/commit/21546942beccbcef80e160cbc6840b983a437361)</small></small>
 
 ### ⚡ Performance
 
@@ -25,12 +62,23 @@ All notable changes to this project will be documented in this file. See [conven
 
 ### ⚙️ Miscellaneous Chores
 
-- **(release)** 0.2.1 <small><small>[(fd590b9)](https://github.com/MagicTINTIN/Valser/commit/fd590b938f88f02ca8f7ee12ccd3377a77abdb6b)</small></small>
+- **(release)** 0.2.2 <small><small>[(2adaf4a)](https://github.com/MagicTINTIN/Valser/commit/2adaf4aadb94126502d42da2676902c253fb9e8f)</small></small>
 - adding configuration definitions and locations <small><small>[(a692794)](https://github.com/MagicTINTIN/Valser/commit/a69279496bd80d96814607a59d4e5e68ceda0b8e)</small></small>
 
 ### 🎨 Style
 
 - unused settings path fix <small><small>[(f0f4e77)](https://github.com/MagicTINTIN/Valser/commit/f0f4e7783a9060c15fe8502a29d5391cba54f9f7)</small></small>
+
+---
+## [\<0.2.1\>](https://github.com/MagicTINTIN/Valser/releases/v0.2.1) - 2026-06-30 <small><small><small>[(compare)](https://github.com/MagicTINTIN/Valser/compare/v0.2.0..v0.2.1)</small></small></small>
+
+### 🐛 Bug Fixes
+
+- using pre release hook of git cliff <small><small>[(2154694)](https://github.com/MagicTINTIN/Valser/commit/21546942beccbcef80e160cbc6840b983a437361)</small></small>
+
+### ⚙️ Miscellaneous Chores
+
+- **(release)** 0.2.1 <small><small>[(fd590b9)](https://github.com/MagicTINTIN/Valser/commit/fd590b938f88f02ca8f7ee12ccd3377a77abdb6b)</small></small>
 
 ### 🏗️ Build
 
